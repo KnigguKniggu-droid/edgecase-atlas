@@ -32,6 +32,7 @@ class RunMetadata:
     candidate_budget: int
     held_out_confirmation_seed_stream: str
     executed_seed_streams: tuple[str, ...]
+    property_ids: tuple[str, ...]
     property_pack_digest: str
     engine_config_hash: str
     confirmation_note: str
@@ -142,6 +143,7 @@ class AtlasEngine:
                 budget,
                 "held-out-confirmation",
                 tuple(executed_streams),
+                tuple(property_.property_id for property_ in properties),
                 property_pack_digest,
                 engine_config_hash,
                 (
@@ -192,7 +194,7 @@ def _certificate(
         reducer_label=minimization.label,
         reducer_vocabulary=minimization.reducer_vocabulary,
         terminal_audit_complete=minimization.terminal_audit_complete,
-        replay_command=f"atlas replay certificates/{certificate_id}.json --seed {seed}",
+        replay_command=f"atlas replay certificates/{certificate_id}.json",
     )
 
 

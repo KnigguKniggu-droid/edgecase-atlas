@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EdgeCase Atlas report {{ metadata.run_id }}</title>
+  <style>
+    :root { color-scheme: dark; --bg: #090d18; --panel: #111827; --line: #334155; --text: #e5e7eb; --muted: #94a3b8; --accent: #22d3ee; --warn: #fbbf24; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; line-height: 1.5; }
+    main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 64px; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin-bottom: 4px; }
+    h2 { margin-top: 32px; }
+    .muted, dt { color: var(--muted); }
+    .notice { border-left: 4px solid var(--warn); background: #1b1a14; padding: 12px 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .card, article { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+    dl { margin: 0; }
+    dt { font-size: 0.82rem; }
+    dd { margin: 2px 0 12px; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    code { color: var(--accent); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 700px) { .pair { grid-template-columns: 1fr; } main { width: min(100% - 20px, 1120px); } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="muted">{{ schema_version }}</p>
+    <h1>EdgeCase Atlas run report</h1>
+    <p><code>{{ metadata.run_id }}</code></p>
+    <p class="notice">This artifact is for simulated research and debugging. It is not vehicle control, certification, or legal compliance. It is not proof of real-world safety.</p>
+  </header>
+
+  <section aria-labelledby="run-summary">
+    <h2 id="run-summary">Run summary</h2>
+    <div class="grid">
+      <div class="card"><dl><dt>Seed</dt><dd>{{ metadata.seed }}</dd></dl></div>
+      <div class="card"><dl><dt>Candidate budget</dt><dd>{{ metadata.candidate_budget }}</dd></dl></div>
+      <div class="card"><dl><dt>Target calls</dt><dd>{{ call_ledger.target_calls_total }}</dd></dl></div>
+      <div class="card"><dl><dt>Run cost</dt><dd>{{ run_cost_display }}</dd></dl></div>
+      <div class="card"><dl><dt>Engine configuration hash</dt><dd><code>{{ metadata.engine_config_hash }}</code></dd></dl></div>
+      <div class="card"><dl><dt>Property-pack digest</dt><dd><code>{{ metadata.property_pack_digest }}</code></dd></dl></div>
+    </div>
+    <p>{{ metadata.confirmation_note }}</p>
+    <p>Coverage estimand: {{ coverage.estimand }}. Observed cells: {{ coverage.cells | length }}.</p>
+  </section>
+
+  <section aria-labelledby="certificates">
+    <h2 id="certificates">Failure certificates</h2>
+    {% if not certificates %}<p>No reproducing certificate was accepted in this run.</p>{% endif %}
+    {% for item in certificates %}
+    <article aria-labelledby="certificate-{{ loop.index }}">
+      <h3 id="certificate-{{ loop.index }}">{{ item.property_title }}</h3>
+      <p><code>{{ item.raw.certificate_id }}</code></p>
+      <p><strong>Editable property assumption:</strong> {{ item.property_assumption }}</p>
+      <p><strong>Operational scope:</strong> {{ item.property_scope }}</p>
+      <p><strong>Reduction claim:</strong> {{ item.raw.reducer_label }}. This is bounded 1-minimality under the declared reducer vocabulary, not a global-smallest or causal claim.</p>
+
+      <h3>Before and after retained changes</h3>
+      <table>
+        <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
+        <tbody>
+        {% for change in item.changes %}
+          <tr><td><code>{{ change.path }}</code></td><td>{{ change.from_value }}</td><td>{{ change.to_value }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="pair">
+        <section>
+          <h3>Source outputs</h3>
+          <table><thead><tr><th>Action</th><th>Risk</th><th>Explanation</th></tr></thead><tbody>
+          {% for decision in item.source_decisions %}<tr><td>{{ decision.action }}</td><td>{{ decision.risk }}</td><td>{{ decision.explanation }}</td></tr>{% endfor %}
+          </tbody></table>
+        </section>
+        <section>
+          <h3>Follow-up outputs</h3>
+          <table><thead><tr><th>Action</th><th>Risk</th><th>Explanation</th></tr></thead><tbody>
+          {% for decision in item.follow_decisions %}<tr><td>{{ decision.action }}</td><td>{{ decision.risk }}</td><td>{{ decision.explanation }}</td></tr>{% endfor %}
+          </tbody></table>
+        </section>
+      </div>
+
+      <h3>Output distributions</h3>
+      <p>Actions: {% for label, count in item.action_distribution %}{{ label }}={{ count }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+      <p>Risks: {% for label, count in item.risk_distribution %}{{ label }}={{ count }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+
+      <h3>Reproduction and replay</h3>
+      <dl>
+        <dt>Reproduction</dt><dd>{{ item.raw.reproduction_count }}/{{ item.raw.reproduction_trials }}</dd>
+        <dt>Seed</dt><dd>{{ item.raw.seed }}</dd>
+        <dt>Model</dt><dd>{{ item.raw.model_id }}</dd>
+        <dt>Model configuration hash</dt><dd><code>{{ item.raw.model_config_hash }}</code></dd>
+        <dt>Software version</dt><dd>{{ item.raw.software_version }}</dd>
+        <dt>Latency</dt><dd>{{ item.raw.latency_ms }} ms</dd>
+        <dt>Estimated cost</dt><dd>{{ item.cost_display }}</dd>
+        <dt>Replay command</dt><dd><code>{{ item.raw.replay_command }}</code></dd>
+      </dl>
+    </article>
+    {% endfor %}
+  </section>
+</main>
+</body>
+</html>

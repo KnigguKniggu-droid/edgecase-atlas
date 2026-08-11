@@ -8,11 +8,10 @@ version = "0.1.0"
 description = "Constraint-guided counterfactual testing for AI driving-decision agents."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-license = {file = "LICENSE"}
+license = "Apache-2.0"
 authors = [{name = "EdgeCase Atlas"}]
 classifiers = [
   "Development Status :: 3 - Alpha",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3.12",
   "Topic :: Software Development :: Testing",
 ]
@@ -44,6 +43,9 @@ atlas = "edgecase_atlas.cli:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+edgecase_atlas = ["templates/*.j2"]
+
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
 asyncio_mode = "auto"
@@ -67,4 +69,3 @@ plugins = ["pydantic.mypy"]
 [tool.coverage.run]
 branch = true
 source = ["edgecase_atlas"]
-

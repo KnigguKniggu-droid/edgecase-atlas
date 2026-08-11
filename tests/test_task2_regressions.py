@@ -200,5 +200,5 @@ async def test_engine_tracks_all_phases_preserves_trace_and_replay_determinism()
             == item.minimization.reproduction.follow_up_decisions
         )
         assert item.certificate.replay_command == (
-            f"atlas replay certificates/{item.certificate.certificate_id}.json --seed 42"
+            f"atlas replay certificates/{item.certificate.certificate_id}.json"
         )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Literal, Protocol, runtime_checkable
 
@@ -12,11 +12,12 @@ from edgecase_atlas.models import Counterfactual, Decision, Scenario
 from edgecase_atlas.properties import PropertyResult, SafetyProperty, evaluate_property
 
 EvaluationPhase = Literal["search", "confirmation", "minimization"]
+PairRole = Literal["source", "follow_up"]
 
 
 @runtime_checkable
 class AgentAdapter(Protocol):
-    """Stable target interface implemented by concrete adapters in Task 3."""
+    """Stable target interface implemented by concrete adapters."""
 
     async def decide(self, scenario: Scenario, seed: int) -> Decision: ...
 
@@ -60,6 +61,25 @@ class SeedStreams:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class InvocationRecord:
+    """One research-complete charged target invocation."""
+
+    phase: EvaluationPhase
+    ordinal: int
+    property_id: str
+    relation_id: str
+    pair_role: PairRole
+    scenario: Scenario
+    seed: int
+    decision: Decision | None
+    succeeded: bool
+    latency_ms: int
+    estimated_cost_usd: float
+    cost_estimate_available: bool
+    error_type: str | None
+
+
 @dataclass(slots=True)
 class CallLedger:
     """Every attempted target invocation is charged exactly once to an operational phase."""
@@ -70,8 +90,24 @@ class CallLedger:
     minimization_calls: int = 0
     estimated_cost_usd: float = 0.0
     cost_estimate_available: bool = False
+    known_cost_calls: int = 0
+    invocations: list[InvocationRecord] = field(default_factory=list)
 
-    def record(self, phase: EvaluationPhase, estimated_cost_usd: float | None) -> None:
+    def record(
+        self,
+        phase: EvaluationPhase,
+        estimated_cost_usd: float | None,
+        *,
+        property_id: str,
+        relation_id: str,
+        pair_role: PairRole,
+        scenario: Scenario,
+        seed: int,
+        decision: Decision | None,
+        succeeded: bool,
+        latency_ms: int,
+        error_type: str | None,
+    ) -> None:
         self.target_calls_total += 1
         if phase == "search":
             self.search_calls += 1
@@ -81,7 +117,25 @@ class CallLedger:
             self.minimization_calls += 1
         if estimated_cost_usd is not None:
             self.estimated_cost_usd += estimated_cost_usd
-            self.cost_estimate_available = True
+            self.known_cost_calls += 1
+        self.cost_estimate_available = self.known_cost_calls == self.target_calls_total
+        self.invocations.append(
+            InvocationRecord(
+                phase=phase,
+                ordinal=self.target_calls_total,
+                property_id=property_id,
+                relation_id=relation_id,
+                pair_role=pair_role,
+                scenario=scenario,
+                seed=seed,
+                decision=decision,
+                succeeded=succeeded,
+                latency_ms=latency_ms,
+                estimated_cost_usd=(0.0 if estimated_cost_usd is None else estimated_cost_usd),
+                cost_estimate_available=estimated_cost_usd is not None,
+                error_type=error_type,
+            )
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,13 +192,26 @@ async def evaluate_pair(
     phase: EvaluationPhase,
 ) -> PairTrial:
     """Evaluate both sides and preserve the paired decisions used by the operational oracle."""
-    source_decision, source_latency = await _decide(
-        adapter, counterfactual.source, seed, ledger, phase
+    source_decision, source_latency, source_cost = await _decide(
+        adapter,
+        counterfactual.source,
+        seed,
+        ledger,
+        phase,
+        property_.property_id,
+        counterfactual.relation_id,
+        "source",
     )
-    follow_up_decision, follow_up_latency = await _decide(
-        adapter, counterfactual.follow_up, seed, ledger, phase
+    follow_up_decision, follow_up_latency, follow_up_cost = await _decide(
+        adapter,
+        counterfactual.follow_up,
+        seed,
+        ledger,
+        phase,
+        property_.property_id,
+        counterfactual.relation_id,
+        "follow_up",
     )
-    estimate = _cost_estimate(adapter)
     return PairTrial(
         seed=seed,
         source_decision=source_decision,
@@ -153,8 +220,8 @@ async def evaluate_pair(
             property_, counterfactual, source_decision, follow_up_decision
         ),
         latency_ms=source_latency + follow_up_latency,
-        estimated_cost_usd=0.0 if estimate is None else estimate * 2,
-        cost_estimate_available=estimate is not None,
+        estimated_cost_usd=sum(cost for cost in (source_cost, follow_up_cost) if cost is not None),
+        cost_estimate_available=source_cost is not None and follow_up_cost is not None,
     )
 
 
@@ -210,17 +277,44 @@ async def _decide(
     seed: int,
     ledger: CallLedger,
     phase: EvaluationPhase,
-) -> tuple[Decision, int]:
+    property_id: str,
+    relation_id: str,
+    pair_role: PairRole,
+) -> tuple[Decision, int, float | None]:
     started = perf_counter()
+    decision: Decision | None = None
+    error_type: str | None = None
     try:
         decision = await adapter.decide(scenario, seed)
+    except BaseException as error:
+        error_type = type(error).__name__
+        raise
     finally:
-        ledger.record(phase, _cost_estimate(adapter))
-    return decision, int((perf_counter() - started) * 1000)
+        latency_ms = int((perf_counter() - started) * 1000)
+        succeeded = decision is not None
+        cost = _cost_estimate(adapter) if succeeded else None
+        ledger.record(
+            phase,
+            cost,
+            property_id=property_id,
+            relation_id=relation_id,
+            pair_role=pair_role,
+            scenario=scenario,
+            seed=seed,
+            decision=decision,
+            succeeded=succeeded,
+            latency_ms=latency_ms,
+            error_type=error_type,
+        )
+    if decision is None:
+        raise RuntimeError("Adapter returned without a Decision or exception")
+    return decision, latency_ms, cost
 
 
 def _cost_estimate(adapter: AgentAdapter) -> float | None:
-    value = getattr(adapter, "estimated_cost_per_call_usd", None)
-    if isinstance(value, (int, float)) and value >= 0:
+    value = getattr(adapter, "last_call_cost_usd", None)
+    if value is None:
+        value = getattr(adapter, "estimated_cost_per_call_usd", None)
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
         return float(value)
     return None

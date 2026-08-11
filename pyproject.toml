@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edgecase-atlas"
+version = "0.1.0"
+description = "Constraint-guided counterfactual testing for AI driving-decision agents."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = {file = "LICENSE"}
+authors = [{name = "EdgeCase Atlas"}]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = [
+  "httpx>=0.28,<1",
+  "hypothesis>=6.156,<7",
+  "jinja2>=3.1,<4",
+  "plotly>=6.0,<7",
+  "pydantic>=2.12,<3",
+  "pyyaml>=6.0,<7",
+  "rich>=14.3,<15",
+  "streamlit>=1.59,<2",
+  "typer>=0.23,<1",
+  "z3-solver>=4.15,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.19,<3",
+  "pytest>=9.0,<10",
+  "pytest-asyncio>=1.3,<2",
+  "respx>=0.22,<1",
+  "ruff>=0.15,<1",
+]
+
+[project.scripts]
+atlas = "edgecase_atlas.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "app", "research", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "RUF"]
+ignore = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["edgecase_atlas"]
+plugins = ["pydantic.mypy"]
+
+[tool.coverage.run]
+branch = true
+source = ["edgecase_atlas"]
+

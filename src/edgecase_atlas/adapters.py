@@ -10,6 +10,7 @@ import os
 import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from typing import cast
 from urllib.parse import urlparse
 
 import httpx
@@ -24,6 +25,10 @@ _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]{1,127}$")
 
 class AdapterError(RuntimeError):
     """Base class for sanitized, typed target-adapter failures."""
+
+
+class AdapterExecutionError(AdapterError):
+    """A Python target raised an execution failure."""
 
 
 class AdapterTimeoutError(AdapterError):
@@ -92,8 +97,25 @@ def _validate_decision(value: object) -> Decision:
         ) from error
 
 
+def _close_late_awaitable(future: asyncio.Future[DecisionOutput]) -> None:
+    """Close a coroutine returned after its trusted sync caller timed out."""
+    try:
+        output = future.result()
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        return
+    if inspect.iscoroutine(output):
+        output.close()
+
+
 class FunctionAdapter:
-    """Run a synchronous or asynchronous Python callable with strict output validation."""
+    """Run trusted Python callables under one end-to-end deadline.
+
+    Trusted synchronous work cannot be forcibly terminated after a timeout because Python
+    worker threads remain alive. Use the subprocess adapter for untrusted or non-cooperative
+    targets that require forcible termination.
+    """
 
     def __init__(
         self,
@@ -111,25 +133,49 @@ class FunctionAdapter:
             "kind": "python",
             "target": f"{target.__module__}.{target.__qualname__}",
             "timeout_seconds": timeout_seconds,
+            "model_id": self.model_id,
         }
         self.last_call_cost_usd: float | None = 0.0
 
     async def decide(self, scenario: Scenario, seed: int) -> Decision:
         self.last_call_cost_usd = 0.0
+        deadline = asyncio.get_running_loop().time() + self.timeout_seconds
         try:
             if inspect.iscoroutinefunction(self._target):
-                output = await asyncio.wait_for(
-                    self._target(scenario, seed), timeout=self.timeout_seconds
-                )
+                output = await self._await_before_deadline(self._target(scenario, seed), deadline)
             else:
-                output = await asyncio.wait_for(
-                    asyncio.to_thread(self._target, scenario, seed), timeout=self.timeout_seconds
-                )
+                sync_target = cast(Callable[[Scenario, int], DecisionOutput], self._target)
+                thread_task = asyncio.create_task(asyncio.to_thread(sync_target, scenario, seed))
+                try:
+                    output = await self._await_before_deadline(
+                        asyncio.shield(thread_task), deadline
+                    )
+                except TimeoutError:
+                    thread_task.add_done_callback(_close_late_awaitable)
+                    raise
                 if inspect.isawaitable(output):
-                    output = await asyncio.wait_for(output, timeout=self.timeout_seconds)
+                    output = await self._await_before_deadline(
+                        cast(Awaitable[DecisionOutput], output), deadline
+                    )
         except TimeoutError as error:
             raise AdapterTimeoutError("Python target exceeded its configured timeout") from error
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            raise AdapterExecutionError("Python target execution failed") from error
         return _validate_decision(output)
+
+    async def _await_before_deadline(
+        self,
+        awaitable: Awaitable[DecisionOutput],
+        deadline: float,
+    ) -> DecisionOutput:
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            if inspect.iscoroutine(awaitable):
+                awaitable.close()
+            raise TimeoutError
+        return await asyncio.wait_for(awaitable, timeout=remaining)
 
 
 class JsonlSubprocessAdapter:
@@ -159,6 +205,9 @@ class JsonlSubprocessAdapter:
             "kind": "subprocess",
             "command": command,
             "timeout_seconds": timeout_seconds,
+            "shutdown_timeout_seconds": shutdown_timeout_seconds,
+            "stderr_limit_bytes": stderr_limit_bytes,
+            "model_id": model_id,
         }
         self.last_call_cost_usd: float | None = 0.0
         self._process: asyncio.subprocess.Process | None = None
@@ -177,16 +226,23 @@ class JsonlSubprocessAdapter:
     async def decide(self, scenario: Scenario, seed: int) -> Decision:
         del seed
         async with self._lock:
-            process = await self._ensure_process()
-            if process.stdin is None or process.stdout is None:
-                await self._abort_locked()
-                raise AdapterProcessError("Subprocess pipes were not available")
             try:
+                process = await self._ensure_process()
+                if process.stdin is None or process.stdout is None:
+                    await self._abort_locked()
+                    raise AdapterProcessError("Subprocess pipes were not available")
                 process.stdin.write((scenario.model_dump_json() + "\n").encode())
                 await asyncio.wait_for(process.stdin.drain(), timeout=self.timeout_seconds)
                 line = await asyncio.wait_for(
                     process.stdout.readline(), timeout=self.timeout_seconds
                 )
+                if not line:
+                    return_code = await self._exit_status_or_abort(process)
+                    stderr = self._bounded_stderr_text()
+                    detail = f"; stderr={stderr}" if stderr else ""
+                    raise AdapterProcessError(
+                        f"Subprocess target exited with status {return_code}{detail}"
+                    )
             except asyncio.CancelledError:
                 await self._cleanup_after_cancellation()
                 raise
@@ -201,14 +257,6 @@ class JsonlSubprocessAdapter:
             except (BrokenPipeError, ConnectionError) as error:
                 await self._abort_locked()
                 raise AdapterProcessError("Subprocess target pipe failed") from error
-            if not line:
-                return_code = await process.wait()
-                await self._clear_finished_locked()
-                stderr = self._bounded_stderr_text()
-                detail = f"; stderr={stderr}" if stderr else ""
-                raise AdapterProcessError(
-                    f"Subprocess target exited with status {return_code}{detail}"
-                )
             try:
                 raw = json.loads(line)
             except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -224,17 +272,32 @@ class JsonlSubprocessAdapter:
         if self._process is not None and self._process.returncode is None:
             return self._process
         self._stderr.clear()
-        try:
-            self._process = await asyncio.create_subprocess_exec(
+        creation = asyncio.create_task(
+            asyncio.create_subprocess_exec(
                 *self.command,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+        )
+        try:
+            process = await asyncio.shield(creation)
+        except asyncio.CancelledError:
+            try:
+                process = await asyncio.shield(creation)
+            except OSError:
+                raise
+            self._register_process(process)
+            await self._cleanup_after_cancellation()
+            raise
         except OSError as error:
             raise AdapterProcessError("Subprocess target could not be started") from error
-        self._stderr_task = asyncio.create_task(self._drain_stderr(self._process))
-        return self._process
+        self._register_process(process)
+        return process
+
+    def _register_process(self, process: asyncio.subprocess.Process) -> None:
+        self._process = process
+        self._stderr_task = asyncio.create_task(self._drain_stderr(process))
 
     async def _drain_stderr(self, process: asyncio.subprocess.Process) -> None:
         if process.stderr is None:
@@ -249,20 +312,42 @@ class JsonlSubprocessAdapter:
         try:
             await asyncio.shield(cleanup)
         except asyncio.CancelledError:
-            await cleanup
+            try:
+                await asyncio.shield(cleanup)
+            except AdapterError:
+                pass
+        except AdapterError:
+            pass
 
     def _bounded_stderr_text(self) -> str:
         return bytes(self._stderr).decode("utf-8", errors="replace")
 
     async def aclose(self) -> None:
         async with self._lock:
-            await self._abort_locked()
+            try:
+                await self._abort_locked()
+            except asyncio.CancelledError:
+                await self._cleanup_after_cancellation()
+                raise
 
     async def __aenter__(self) -> JsonlSubprocessAdapter:
         return self
 
     async def __aexit__(self, *_exc: object) -> None:
         await self.aclose()
+
+    async def _exit_status_or_abort(self, process: asyncio.subprocess.Process) -> int:
+        try:
+            return_code = await asyncio.wait_for(
+                process.wait(), timeout=self.shutdown_timeout_seconds
+            )
+        except TimeoutError as error:
+            await self._abort_locked()
+            raise AdapterProcessError(
+                "Subprocess closed stdout without exiting within the shutdown timeout"
+            ) from error
+        await self._clear_finished_locked()
+        return return_code
 
     async def _abort_locked(self) -> None:
         process = self._process
@@ -280,7 +365,12 @@ class JsonlSubprocessAdapter:
                     process.kill()
                 except ProcessLookupError:
                     pass
-                await process.wait()
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=self.shutdown_timeout_seconds)
+                except TimeoutError as error:
+                    raise AdapterProcessError(
+                        "Subprocess could not be reaped within the shutdown timeout"
+                    ) from error
         await self._clear_finished_locked()
 
     async def _clear_finished_locked(self) -> None:
@@ -379,6 +469,7 @@ class OpenAICompatibleAdapter:
             "network_enabled": network_enabled,
             "timeout_seconds": timeout_seconds,
             "max_retries": max_retries,
+            "retry_backoff_seconds": retry_backoff_seconds,
             "input_cost_per_million_tokens": input_cost_per_million_tokens,
             "output_cost_per_million_tokens": output_cost_per_million_tokens,
             "input_token_reservation": input_token_reservation,
@@ -390,21 +481,21 @@ class OpenAICompatibleAdapter:
 
     @property
     def reservation_per_request_usd(self) -> float:
+        return self._request_reservation_usd(self.input_token_reservation)
+
+    def _request_reservation_usd(self, input_tokens: int) -> float:
         return (
-            self.input_token_reservation * self.input_cost_per_million_tokens
+            input_tokens * self.input_cost_per_million_tokens
             + self.max_tokens * self.output_cost_per_million_tokens
         ) / 1_000_000
 
     async def decide(self, scenario: Scenario, seed: int) -> Decision:
+        self.last_call_cost_usd = None
         if not self.network_enabled:
             raise NetworkDisabledError("OpenAI-compatible network access is disabled")
         api_key = os.environ.get(self.api_key_env)
         if not api_key:
             raise AdapterError("Configured API key environment variable is missing")
-        reservation = self.reservation_per_request_usd
-        if reservation <= 0:
-            raise UsageMetadataError("Configured token rates cannot support fail-closed accounting")
-        self.last_call_cost_usd = None
         payload = {
             "model": self.model_id,
             "seed": seed,
@@ -422,14 +513,31 @@ class OpenAICompatibleAdapter:
                 },
             ],
         }
+        request_bytes = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        required_input_tokens = len(request_bytes)
+        if required_input_tokens > self.input_token_reservation:
+            raise UsageMetadataError(
+                "Configured input token reservation is below the conservative request bound"
+            )
+        reservation = self._request_reservation_usd(required_input_tokens)
+        if reservation <= 0:
+            raise UsageMetadataError("Configured token rates cannot support fail-closed accounting")
         response: httpx.Response | None = None
         for attempt in range(self.max_retries + 1):
             self.budget.reserve(reservation)
             try:
                 response = await self._client.post(
                     f"{self.base_url}/chat/completions",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    content=request_bytes,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
                     timeout=self.timeout_seconds,
                 )
             except httpx.TimeoutException as error:
@@ -460,7 +568,7 @@ class OpenAICompatibleAdapter:
             body = response.json()
         except ValueError as error:
             raise AdapterSchemaError("Endpoint returned malformed response JSON") from error
-        cost = self._explicit_usage_cost(body, reservation)
+        cost = self._explicit_usage_cost(body, reservation, required_input_tokens)
         try:
             content = body["choices"][0]["message"]["content"]
             raw_decision = json.loads(content)
@@ -471,7 +579,12 @@ class OpenAICompatibleAdapter:
         self.last_call_cost_usd = cost
         return decision
 
-    def _explicit_usage_cost(self, body: object, reservation: float) -> float:
+    def _explicit_usage_cost(
+        self,
+        body: object,
+        reservation: float,
+        required_input_tokens: int,
+    ) -> float:
         if not isinstance(body, dict) or not isinstance(body.get("usage"), dict):
             raise UsageMetadataError("Endpoint omitted explicit token usage; reservation retained")
         usage = body["usage"]
@@ -486,7 +599,7 @@ class OpenAICompatibleAdapter:
             or completion_tokens < 0
         ):
             raise UsageMetadataError("Endpoint token usage is invalid; reservation retained")
-        if prompt_tokens > self.input_token_reservation or completion_tokens > self.max_tokens:
+        if prompt_tokens > required_input_tokens or completion_tokens > self.max_tokens:
             raise UsageMetadataError("Endpoint usage exceeded the conservative reservation")
         actual = (
             prompt_tokens * self.input_cost_per_million_tokens

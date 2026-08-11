@@ -168,11 +168,9 @@ def _certificate(
     engine_config_hash: str,
 ) -> FailureCertificate:
     relation = minimization.counterfactual
-    certificate_id = _certificate_id(
-        adapter, property_, minimization, seed, property_semantics_digest, engine_config_hash
-    )
-    return FailureCertificate(
-        certificate_id=certificate_id,
+    cost_available = minimization.reproduction.cost_estimate_available
+    provisional = FailureCertificate(
+        certificate_id="pending",
         relation_id=relation.relation_id,
         property_id=property_.property_id,
         source=relation.source,
@@ -187,14 +185,23 @@ def _certificate(
         software_version=__version__,
         seed=seed,
         latency_ms=minimization.reproduction.latency_ms,
-        estimated_cost_usd=minimization.reproduction.estimated_cost_usd,
-        cost_estimate_available=minimization.reproduction.cost_estimate_available,
+        estimated_cost_usd=(
+            minimization.reproduction.estimated_cost_usd if cost_available else 0.0
+        ),
+        cost_estimate_available=cost_available,
         property_semantics_digest=property_semantics_digest,
         engine_config_hash=engine_config_hash,
         reducer_label=minimization.label,
         reducer_vocabulary=minimization.reducer_vocabulary,
         terminal_audit_complete=minimization.terminal_audit_complete,
-        replay_command=f"atlas replay certificates/{certificate_id}.json",
+        replay_command="pending",
+    )
+    certificate_id = recompute_certificate_id(provisional)
+    return provisional.model_copy(
+        update={
+            "certificate_id": certificate_id,
+            "replay_command": f"atlas replay certificates/{certificate_id}.json",
+        }
     )
 
 
@@ -206,29 +213,42 @@ def _certificate_id(
     property_semantics_digest: str,
     engine_config_hash: str,
 ) -> str:
-    relation = minimization.counterfactual
+    """Retain the Task 2 helper while delegating to the public evidence digest."""
+    return _certificate(
+        adapter,
+        property_,
+        minimization,
+        seed,
+        property_semantics_digest,
+        engine_config_hash,
+    ).certificate_id
+
+
+def recompute_certificate_id(certificate: FailureCertificate) -> str:
+    """Recompute the public, deterministic digest over stable certificate evidence."""
     evidence = {
-        "property_id": property_.property_id,
-        "property_semantics_digest": property_semantics_digest,
-        "relation": relation.model_dump(mode="json"),
+        "relation_id": certificate.relation_id,
+        "property_id": certificate.property_id,
+        "source": certificate.source.model_dump(mode="json"),
+        "minimized_follow_up": certificate.minimized_follow_up.model_dump(mode="json"),
+        "changed_fields": [change.model_dump(mode="json") for change in certificate.changed_fields],
         "source_decisions": [
-            decision.model_dump(mode="json")
-            for decision in minimization.reproduction.source_decisions
+            decision.model_dump(mode="json") for decision in certificate.source_decisions
         ],
         "follow_up_decisions": [
-            decision.model_dump(mode="json")
-            for decision in minimization.reproduction.follow_up_decisions
+            decision.model_dump(mode="json") for decision in certificate.follow_up_decisions
         ],
-        "reproduction_count": minimization.reproduction_count,
-        "reproduction_trials": minimization.reproduction_trials,
-        "reducer_label": minimization.label,
-        "reducer_vocabulary": minimization.reducer_vocabulary,
-        "terminal_audit_complete": minimization.terminal_audit_complete,
-        "model_id": adapter_model_id(adapter),
-        "model_config_hash": model_config_hash(adapter),
-        "seed": seed,
-        "software_version": __version__,
-        "engine_config_hash": engine_config_hash,
+        "reproduction_count": certificate.reproduction_count,
+        "reproduction_trials": certificate.reproduction_trials,
+        "model_id": certificate.model_id,
+        "model_config_hash": certificate.model_config_hash,
+        "software_version": certificate.software_version,
+        "seed": certificate.seed,
+        "property_semantics_digest": certificate.property_semantics_digest,
+        "engine_config_hash": certificate.engine_config_hash,
+        "reducer_label": certificate.reducer_label,
+        "reducer_vocabulary": certificate.reducer_vocabulary,
+        "terminal_audit_complete": certificate.terminal_audit_complete,
     }
     return f"case-{_digest_json(evidence)[:20]}"
 

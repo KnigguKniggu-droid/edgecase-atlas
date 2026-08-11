@@ -37,7 +37,7 @@ def _adapter(**overrides: Any) -> OpenAICompatibleAdapter:
         "network_enabled": True,
         "input_cost_per_million_tokens": 1.0,
         "output_cost_per_million_tokens": 1.0,
-        "input_token_reservation": 100,
+        "input_token_reservation": 10_000,
         "max_tokens": 100,
         "max_retries": 0,
         "retry_backoff_seconds": 0,

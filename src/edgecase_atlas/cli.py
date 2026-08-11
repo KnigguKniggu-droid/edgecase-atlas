@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Annotated, NoReturn, cast
 
 import typer
+import yaml  # type: ignore[import-untyped]
+from jinja2 import TemplateError
 from pydantic import ValidationError
 
 from edgecase_atlas import __version__
@@ -28,12 +30,18 @@ from edgecase_atlas.config import (
     SubprocessAdapterConfig,
     load_config,
 )
-from edgecase_atlas.engine import AtlasEngine, _engine_config_hash, _property_digest
+from edgecase_atlas.engine import (
+    AtlasEngine,
+    _engine_config_hash,
+    _property_digest,
+    recompute_certificate_id,
+)
 from edgecase_atlas.evaluation import (
     AgentAdapter,
     CallLedger,
     ReproductionResult,
     SeedStreams,
+    adapter_model_id,
     evaluate_suspected_violation,
     model_config_hash,
 )
@@ -68,8 +76,11 @@ def init_command(
     """Create a safe no-key demonstration configuration."""
     if path.exists() and not force:
         _fail(f"Configuration already exists: {path}. Use --force to replace it.")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(DEFAULT_CONFIG_YAML, encoding="utf-8", newline="\n")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(DEFAULT_CONFIG_YAML, encoding="utf-8", newline="\n")
+    except OSError:
+        _fail("Atlas init failed. Filesystem details are not printed.")
     typer.echo(f"Created {path}")
 
 
@@ -96,7 +107,15 @@ def test_command(
     config = _load_config_or_exit(config_path)
     try:
         paths = asyncio.run(_run_test(config, budget=budget, seed=seed))
-    except (AdapterError, ImportError, AttributeError, TypeError, ValueError):
+    except (
+        AdapterError,
+        ImportError,
+        AttributeError,
+        TemplateError,
+        OSError,
+        TypeError,
+        ValueError,
+    ):
         _fail("Atlas test failed. Target details and secrets are not printed.")
     typer.echo(f"Run: {paths['run']}")
     typer.echo(f"Trace: {paths['trace']}")
@@ -118,7 +137,15 @@ def replay_command(
             certificate_path.read_text(encoding="utf-8")
         )
         result = asyncio.run(_replay(config, certificate))
-    except (OSError, ValidationError, AdapterError, ImportError, AttributeError, ValueError):
+    except (
+        OSError,
+        ValidationError,
+        AdapterError,
+        ImportError,
+        AttributeError,
+        TypeError,
+        ValueError,
+    ):
         _fail("Atlas replay failed. Evidence or configuration did not match.")
     typer.echo(
         f"Reproduced {result.reproduction_count}/{result.reproduction_trials} "
@@ -146,7 +173,7 @@ def report_command(
             raise ValueError("Run ID is not a canonical Atlas identifier")
         output = Path("reports") / f"{run_id}.html"
         render_html_report(document, output)
-    except (OSError, KeyError, TypeError, ValueError):
+    except (OSError, KeyError, TemplateError, TypeError, ValueError):
         _fail("Atlas report failed. The run artifact is invalid.")
     typer.echo(f"Report: {output}")
 
@@ -182,8 +209,12 @@ async def _replay(config: AtlasConfig, certificate: FailureCertificate) -> Repro
         property_ = _property_by_id(certificate.property_id)
         if certificate.reproduction_trials != 5:
             raise ValueError("Alpha replay requires exactly five recorded trials")
+        if recompute_certificate_id(certificate) != certificate.certificate_id:
+            raise ValueError("Certificate content digest does not match its identifier")
         if certificate.property_id not in config.property_ids:
             raise ValueError("Certificate property is not enabled by the configuration")
+        if adapter_model_id(adapter) != certificate.model_id:
+            raise ValueError("Configured model ID does not match the certificate")
         if model_config_hash(adapter) != certificate.model_config_hash:
             raise ValueError("Configured model hash does not match the certificate")
         if certificate.software_version != __version__:
@@ -270,7 +301,7 @@ def _property_by_id(property_id: str) -> SafetyProperty:
 def _load_config_or_exit(path: Path) -> AtlasConfig:
     try:
         return load_config(path)
-    except (OSError, ValidationError, ValueError):
+    except (OSError, ValidationError, yaml.YAMLError, ValueError):
         _fail("Configuration is invalid. Secret values are never printed.")
 
 

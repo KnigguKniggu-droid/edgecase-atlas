@@ -36,12 +36,12 @@ async def test_run_embeds_ordered_property_snapshot_and_report_uses_only_artifac
     assert certificate["output_distribution"]["risks"]
 
     certificate["property"]["description"] = "Frozen artifact assumption sentinel."
-    document["property_pack"][0]["description"] = "Changed live pack must not win."
+    document["property_pack"][0]["description"] = "Selected pack artifact sentinel."
     output = tmp_path / "snapshot.html"
     render_html_report(document, output)
     html = output.read_text(encoding="utf-8")
     assert "Frozen artifact assumption sentinel." in html
-    assert "Changed live pack must not win." not in html
+    assert "Selected pack artifact sentinel." in html
 
 
 @pytest.mark.asyncio

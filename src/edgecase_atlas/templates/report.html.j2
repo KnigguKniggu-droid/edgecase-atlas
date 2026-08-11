@@ -49,6 +49,18 @@
     <p>Coverage estimand: {{ coverage.estimand }}. Observed cells: {{ coverage.cells | length }}.</p>
   </section>
 
+  <section aria-labelledby="selected-properties">
+    <h2 id="selected-properties">Selected safety properties</h2>
+    {% for property in property_pack %}
+    <article>
+      <h3>{{ property.title }}</h3>
+      <p><code>{{ property.property_id }}</code></p>
+      <p><strong>Editable property assumption:</strong> {{ property.description }}</p>
+      <p><strong>Operational scope:</strong> {{ property.scope_note }}</p>
+    </article>
+    {% endfor %}
+  </section>
+
   <section aria-labelledby="certificates">
     <h2 id="certificates">Failure certificates</h2>
     {% if not certificates %}<p>No reproducing certificate was accepted in this run.</p>{% endif %}

@@ -221,6 +221,12 @@ class FailureCertificate(AtlasModel):
     seed: int = Field(ge=0)
     latency_ms: int = Field(ge=0)
     estimated_cost_usd: float = Field(ge=0, allow_inf_nan=False)
+    cost_estimate_available: bool = False
+    property_semantics_digest: str = Field(default="unknown", min_length=1, max_length=128)
+    engine_config_hash: str = Field(default="unknown", min_length=1, max_length=128)
+    reducer_label: str = Field(default="unreduced", min_length=1, max_length=200)
+    reducer_vocabulary: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
+    terminal_audit_complete: bool = False
     replay_command: str = Field(min_length=1, max_length=1000)
 
     @model_validator(mode="after")
@@ -238,6 +244,8 @@ class FailureCertificate(AtlasModel):
             raise ValueError("source_decisions length must equal reproduction_trials")
         if len(self.follow_up_decisions) != self.reproduction_trials:
             raise ValueError("follow_up_decisions length must equal reproduction_trials")
+        if not self.cost_estimate_available and self.estimated_cost_usd != 0:
+            raise ValueError("Unknown cost estimates must serialize as unavailable and zero-valued")
         return self
 
 

@@ -114,8 +114,8 @@ def _property(property_id: str) -> SafetyProperty:
 
 def known_violation_cases() -> tuple[KnownViolationCase, ...]:
     """Return five stable synthetic property violations, one for each starter property."""
-    red = _scenario("fixture-red", signal="red")
-    red_follow_up = red.model_copy(update={"scenario_id": "fixture-red-follow-up"})
+    red = _scenario("fixture-red", signal="green")
+    red_follow_up = red.model_copy(update={"scenario_id": "fixture-red-follow-up", "signal": "red"})
     no_hazard = _scenario("fixture-no-hazard")
     with_hazard = no_hazard.model_copy(
         update={
@@ -172,7 +172,9 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
             "red_signal_no_proceed",
             _property("red_signal_no_proceed"),
             _counterfactual(red, red_follow_up, "red_signal"),
-            Decision(action="proceed", risk="low", explanation="Intentional red-signal defect."),
+            Decision(
+                action="reduce_speed", risk="high", explanation="Intentional baseline caution."
+            ),
             Decision(action="proceed", risk="low", explanation="Intentional red-signal defect."),
         ),
         KnownViolationCase(

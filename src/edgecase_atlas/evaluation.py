@@ -123,6 +123,10 @@ class ReproductionResult:
     def estimated_cost_usd(self) -> float:
         return sum(trial.estimated_cost_usd for trial in self.trials)
 
+    @property
+    def cost_estimate_available(self) -> bool:
+        return bool(self.trials) and all(trial.cost_estimate_available for trial in self.trials)
+
 
 async def evaluate_pair(
     adapter: AgentAdapter,

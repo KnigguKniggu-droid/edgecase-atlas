@@ -25,92 +25,121 @@ Visibility = Literal["clear", "reduced", "occluded"]
 
 
 @dataclass(frozen=True, slots=True)
-class GeneratedCase:
-    """One valid generated counterfactual and its declared operational property."""
+class ScenarioPrimitive:
+    """Shared typed construction input for Hypothesis and deterministic production generation."""
 
+    scenario_id: str
+    seed: int
+    road_type: Road
+    speed_mph: float
+    speed_limit_mph: float
+    signal: Signal
+    surface: Surface
+    visibility: Visibility
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedCase:
     property: SafetyProperty
     counterfactual: Counterfactual
 
 
 @st.composite
-def scenario_strategy(draw: st.DrawFn) -> Scenario:
-    """Return valid structured Hypothesis scenario primitives for tests and future campaigns.
-
-    Production generation deliberately uses the seeded routines below. It never calls
-    ``example()`` because reproducibility and a fixed candidate budget are release invariants.
-    """
+def scenario_primitive_strategy(draw: st.DrawFn) -> ScenarioPrimitive:
+    """Return valid typed construction inputs without using production-only randomness."""
     road_type: Road = draw(st.sampled_from(("residential", "urban", "highway", "intersection")))
     signal: Signal = "none"
     if road_type in {"urban", "intersection"}:
         signal = draw(st.sampled_from(("red", "yellow", "green", "none")))
-    speed_limit = draw(
-        st.floats(min_value=20.0, max_value=75.0, allow_nan=False, allow_infinity=False)
-    )
-    return Scenario(
+    return ScenarioPrimitive(
         scenario_id=draw(st.uuids()).hex,
         seed=draw(st.integers(min_value=0, max_value=(2**63) - 1)),
         road_type=road_type,
         speed_mph=draw(
             st.floats(min_value=0.0, max_value=125.0, allow_nan=False, allow_infinity=False)
         ),
-        speed_limit_mph=speed_limit,
+        speed_limit_mph=draw(
+            st.floats(min_value=20.0, max_value=75.0, allow_nan=False, allow_infinity=False)
+        ),
         signal=signal,
         surface=draw(st.sampled_from(("dry", "wet", "icy"))),
         visibility=draw(st.sampled_from(("clear", "reduced", "occluded"))),
+    )
+
+
+def scenario_from_primitive(primitive: ScenarioPrimitive) -> Scenario:
+    """The single typed construction contract used by strategies and bounded production."""
+    return Scenario(
+        scenario_id=primitive.scenario_id,
+        seed=primitive.seed,
+        road_type=primitive.road_type,
+        speed_mph=primitive.speed_mph,
+        speed_limit_mph=primitive.speed_limit_mph,
+        signal=primitive.signal,
+        surface=primitive.surface,
+        visibility=primitive.visibility,
         actors=(),
         description="A newly authored synthetic road scenario.",
         provenance=_generated_provenance(),
     )
 
 
+def scenario_strategy() -> st.SearchStrategy[Scenario]:
+    """Expose the shared typed primitive as valid Scenario models for Hypothesis callers."""
+    return scenario_primitive_strategy().map(scenario_from_primitive)
+
+
 def generate_corpus(
     properties: tuple[SafetyProperty, ...], *, seed: int, budget: int
 ) -> tuple[GeneratedCase, ...]:
-    """Generate an ordered valid corpus deterministically from a candidate budget.
-
-    ``budget`` counts proposed paired candidates only. It is not a charged target-agent-call
-    budget. Research fairness uses the complete :class:`CallLedger` at evaluation time.
-    """
+    """Generate an ordered corpus from a deterministic candidate budget, never `.example()`."""
     if budget < 0:
         raise ValueError("budget must be nonnegative")
     if not properties or budget == 0:
         return ()
     # Deterministic non-cryptographic generation is an explicit product contract.
     rng = Random(seed)  # noqa: S311
-    output: list[GeneratedCase] = []
-    for index in range(budget):
-        property_ = properties[index % len(properties)]
-        source = _base_scenario(rng, seed, index, property_.property_id)
-        output.append(
-            GeneratedCase(property_, transform_for_property(property_, source, rng, index))
+    return tuple(
+        GeneratedCase(
+            property_,
+            transform_for_property(
+                property_, _base_scenario(rng, seed, index, property_.property_id), rng, index
+            ),
         )
-    return tuple(output)
+        for index, property_ in (
+            (index, properties[index % len(properties)]) for index in range(budget)
+        )
+    )
 
 
 def transform_for_property(
     property_: SafetyProperty, source: Scenario, rng: Random, ordinal: int
 ) -> Counterfactual:
-    """Apply one declared property relation while freezing every non-target factor."""
     property_id = property_.property_id
-    follow_up: Scenario
     if property_id == "red_signal_no_proceed":
         source = source.model_copy(
-            update={"road_type": "intersection", "signal": "red", "actors": ()}
+            update={"road_type": "intersection", "signal": "green", "actors": ()}
         )
-        follow_up = source.model_copy(update={"scenario_id": f"{source.scenario_id}-paired"})
+        follow_up = source.model_copy(
+            update={"scenario_id": f"{source.scenario_id}-paired", "signal": "red"}
+        )
         relation_id = "red_signal"
     elif property_id == "hazard_non_aggression":
         source = source.model_copy(update={"actors": ()})
-        hazard = Actor(
-            actor_id=f"hazard-{ordinal}",
-            actor_type="hazard",
-            relevance="relevant",
-            lane_relation="ego_lane",
-            distance_m=float(rng.randint(2, 25)),
-            event_metadata=(("severity", "relevant"),),
-        )
         follow_up = source.model_copy(
-            update={"scenario_id": f"{source.scenario_id}-paired", "actors": (hazard,)}
+            update={
+                "scenario_id": f"{source.scenario_id}-paired",
+                "actors": (
+                    Actor(
+                        actor_id=f"hazard-{ordinal}",
+                        actor_type="hazard",
+                        relevance="relevant",
+                        lane_relation="ego_lane",
+                        distance_m=float(rng.randint(2, 25)),
+                        event_metadata=(("severity", "relevant"),),
+                    ),
+                ),
+            }
         )
         relation_id = "add_relevant_hazard"
     elif property_id == "overspeed_risk_monotonicity":
@@ -168,7 +197,6 @@ def transform_for_property(
 def build_counterfactual(
     property_: SafetyProperty, source: Scenario, follow_up: Scenario, relation_id: str
 ) -> Counterfactual:
-    """Revalidate typed and Z3 constraints before checking canonical frozen-field semantics."""
     assert_valid_scenario(source)
     assert_valid_scenario(follow_up)
     relation = Counterfactual(
@@ -195,19 +223,20 @@ def _generated_provenance() -> Provenance:
 
 def _base_scenario(rng: Random, seed: int, ordinal: int, property_id: str) -> Scenario:
     road_type: Road = rng.choice(("residential", "urban", "highway", "intersection"))
-    signal: Signal = "none"
-    if road_type in {"urban", "intersection"}:
-        signal = rng.choice(("none", "yellow", "green"))
-    return Scenario(
-        scenario_id=f"generated-{seed}-{ordinal}-{property_id}",
-        seed=seed,
-        road_type=road_type,
-        speed_mph=float(rng.randint(5, 45)),
-        speed_limit_mph=float(rng.choice((25, 30, 35, 45, 55))),
-        signal=signal,
-        surface=rng.choice(("dry", "wet", "icy")),
-        visibility=rng.choice(("clear", "reduced", "occluded")),
-        actors=(),
-        description="A newly authored synthetic road scenario.",
-        provenance=_generated_provenance(),
+    signal: Signal = (
+        "none"
+        if road_type not in {"urban", "intersection"}
+        else rng.choice(("none", "yellow", "green"))
+    )
+    return scenario_from_primitive(
+        ScenarioPrimitive(
+            f"generated-{seed}-{ordinal}-{property_id}",
+            seed,
+            road_type,
+            float(rng.randint(5, 45)),
+            float(rng.choice((25, 30, 35, 45, 55))),
+            signal,
+            rng.choice(("dry", "wet", "icy")),
+            rng.choice(("clear", "reduced", "occluded")),
+        )
     )

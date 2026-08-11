@@ -25,6 +25,14 @@ type SourceKind = Literal["synthetic", "public_record", "curated_sample"]
 type JsonScalar = str | int | float | bool | None
 type EventMetadataKey = Literal["movement", "intent", "state", "severity", "signal_phase", "source"]
 
+_STARTER_PROPERTY_RELATIONS = {
+    "red_signal_no_proceed": "red_signal",
+    "hazard_non_aggression": "add_relevant_hazard",
+    "overspeed_risk_monotonicity": "increase_speed",
+    "crossing_pedestrian_caution": "pedestrian_crossing",
+    "paraphrase_invariance": "semantic_paraphrase",
+}
+
 _PERSONAL_DATA_MARKERS = (
     "@",
     "name:",
@@ -115,8 +123,10 @@ class Actor(AtlasModel):
         if len(keys) != len(set(keys)):
             raise ValueError("event_metadata keys must be unique")
         for _key, item in value:
-            if len(item) > 240 or any(
-                marker in item.casefold() for marker in _PERSONAL_DATA_MARKERS
+            if (
+                len(item) > 240
+                or any(marker in item.casefold() for marker in _PERSONAL_DATA_MARKERS)
+                or _PHONE_PATTERN.search(item)
             ):
                 raise ValueError("event_metadata only supports non-identifying event values")
         return value
@@ -190,14 +200,17 @@ class Counterfactual(AtlasModel):
 
 
 class FailureCertificate(AtlasModel):
-    """Portable evidence that an operational property violation reproduced."""
+    """Portable evidence that an operational property violation reproduced.
+
+    Historical provenance beyond structural consistency is an engine responsibility.
+    """
 
     certificate_id: str = Field(min_length=1, max_length=100)
     relation_id: str = Field(min_length=1, max_length=100)
     property_id: str = Field(min_length=1, max_length=100)
     source: Scenario
     minimized_follow_up: Scenario
-    changed_fields: tuple[FieldChange, ...]
+    changed_fields: tuple[FieldChange, ...] = Field(min_length=1, max_length=128)
     source_decisions: tuple[Decision, ...]
     follow_up_decisions: tuple[Decision, ...]
     reproduction_count: int = Field(ge=0)
@@ -212,6 +225,13 @@ class FailureCertificate(AtlasModel):
 
     @model_validator(mode="after")
     def validate_reproduction_evidence(self) -> FailureCertificate:
+        if self.changed_fields != canonical_scenario_diffs(self.source, self.minimized_follow_up):
+            raise ValueError(
+                "changed_fields must equal canonical_scenario_diffs(source, minimized_follow_up)"
+            )
+        expected_relation = _STARTER_PROPERTY_RELATIONS.get(self.property_id)
+        if expected_relation is not None and self.relation_id != expected_relation:
+            raise ValueError("relation_id must match the starter property relation")
         if self.reproduction_count > self.reproduction_trials:
             raise ValueError("reproduction_count cannot exceed reproduction_trials")
         if len(self.source_decisions) != self.reproduction_trials:

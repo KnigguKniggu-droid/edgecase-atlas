@@ -66,7 +66,11 @@ def property_by_id(property_id: str):
 def test_red_oracle_only_checks_the_red_member(red_on_source: bool) -> None:
     red = scenario(scenario_id="red", signal="red")
     green = scenario(scenario_id="green", signal="green")
-    pair = relation(red, green) if red_on_source else relation(green, red)
+    pair = (
+        relation(red, green, relation_id="red_signal")
+        if red_on_source
+        else relation(green, red, relation_id="red_signal")
+    )
     red_decision = decision("stop")
     green_decision = decision("proceed")
     source_decision, follow_up_decision = (
@@ -85,7 +89,11 @@ def test_red_oracle_only_checks_the_red_member(red_on_source: bool) -> None:
 def test_red_oracle_detects_proceed_on_either_red_member(red_on_source: bool) -> None:
     red = scenario(scenario_id="red", signal="red")
     green = scenario(scenario_id="green", signal="green")
-    pair = relation(red, green) if red_on_source else relation(green, red)
+    pair = (
+        relation(red, green, relation_id="red_signal")
+        if red_on_source
+        else relation(green, red, relation_id="red_signal")
+    )
     source_decision, follow_up_decision = (
         (decision("proceed"), decision("stop"))
         if red_on_source
@@ -127,7 +135,7 @@ def test_all_public_models_round_trip_and_nested_metadata_is_immutable() -> None
     source = scenario(actors=(actor,))
     follow_up = source.model_copy(update={"scenario_id": "review-follow-up", "speed_mph": 25.0})
     counterfactual = relation(source, follow_up)
-    certificate = certificate_for(counterfactual)
+    certificate = certificate_for(counterfactual, property_id="custom_property")
 
     for model in (actor, source.provenance, source, counterfactual, certificate):
         assert type(model).model_validate_json(model.model_dump_json()) == model

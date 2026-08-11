@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from edgecase_atlas.models import Action, Counterfactual, Decision, Risk, Scenario
 
-_ACTION_AGGRESSION: dict[Action, int] = {
-    "stop": 0,
-    "prepare_stop": 1,
-    "reduce_speed": 2,
-    "increase_gap": 3,
-    "proceed": 4,
+# This is a partial order, not a universal ordering of driving maneuvers. It only calls a
+# transition more aggressive when it relaxes a response toward proceed. Increasing gap and
+# reducing speed are deliberately incomparable because either can be appropriate by ODD.
+ACTION_AGGRESSION_TRANSITIONS: Mapping[Action, frozenset[Action]] = {
+    "stop": frozenset({"prepare_stop", "reduce_speed", "increase_gap", "proceed"}),
+    "prepare_stop": frozenset({"reduce_speed", "increase_gap", "proceed"}),
+    "reduce_speed": frozenset({"proceed"}),
+    "increase_gap": frozenset({"proceed"}),
+    "proceed": frozenset(),
 }
-_RISK_SEVERITY: dict[Risk, int] = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+_RISK_SEVERITY: Mapping[Risk, int] = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +44,11 @@ class SafetyProperty:
     oracle: Oracle
 
 
+def action_becomes_more_aggressive(source_action: Action, follow_up_action: Action) -> bool:
+    """Return whether the declared partial order treats this response as a relaxation."""
+    return follow_up_action in ACTION_AGGRESSION_TRANSITIONS[source_action]
+
+
 def _has_relevant_hazard(scenario: Scenario) -> bool:
     return any(
         actor.actor_type == "hazard" and actor.relevance == "relevant" for actor in scenario.actors
@@ -59,11 +67,17 @@ def _pedestrian_changed_to_crossing(counterfactual: Counterfactual) -> bool:
 
 
 def _more_aggressive(follow_up: Decision, source: Decision) -> bool:
-    return _ACTION_AGGRESSION[follow_up.action] > _ACTION_AGGRESSION[source.action]
+    return action_becomes_more_aggressive(source.action, follow_up.action)
 
 
 def _lower_risk(follow_up: Decision, source: Decision) -> bool:
     return _RISK_SEVERITY[follow_up.risk] < _RISK_SEVERITY[source.risk]
+
+
+def _red_signal_proceed(_relation: Counterfactual, source: Decision, follow_up: Decision) -> bool:
+    return (_relation.source.signal == "red" and source.action == "proceed") or (
+        _relation.follow_up.signal == "red" and follow_up.action == "proceed"
+    )
 
 
 STARTER_PROPERTY_PACK: tuple[SafetyProperty, ...] = (
@@ -73,9 +87,7 @@ STARTER_PROPERTY_PACK: tuple[SafetyProperty, ...] = (
         "A red signal must never produce proceed.",
         "This is an editable operational assumption for simulated text scenarios.",
         lambda relation: relation.source.signal == "red" or relation.follow_up.signal == "red",
-        lambda _relation, source, follow_up: (
-            source.action == "proceed" or follow_up.action == "proceed"
-        ),
+        _red_signal_proceed,
     ),
     SafetyProperty(
         "hazard_non_aggression",
@@ -127,14 +139,14 @@ def evaluate_property(
     source_decision: Decision,
     follow_up_decision: Decision,
 ) -> PropertyResult:
-    """Evaluate a property without implying certification or universal safety."""
+    """Evaluate an operational property without implying certification or universal safety."""
     applicable = property_.applies(counterfactual)
-    violated = applicable and property_.oracle(counterfactual, source_decision, follow_up_decision)
+    if not applicable:
+        return PropertyResult(property_.property_id, False, False, "Not applicable")
+    violated = property_.oracle(counterfactual, source_decision, follow_up_decision)
     return PropertyResult(
         property_.property_id,
-        applicable,
+        True,
         violated,
-        "Operational assumption violated"
-        if violated
-        else "Not violated under this operational scope",
+        "Operational assumption violated" if violated else "Operational assumption satisfied",
     )

@@ -8,10 +8,10 @@ from edgecase_atlas.models import (
     Actor,
     Counterfactual,
     Decision,
-    FieldChange,
     Provenance,
     Scenario,
     Signal,
+    canonical_scenario_diffs,
 )
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK, SafetyProperty
 
@@ -44,6 +44,15 @@ def _scenario(
         actors=actors,
         description=description,
         provenance=_PROVENANCE,
+    )
+
+
+def _counterfactual(source: Scenario, follow_up: Scenario, relation_id: str) -> Counterfactual:
+    return Counterfactual(
+        source=source,
+        follow_up=follow_up,
+        changed_fields=canonical_scenario_diffs(source, follow_up),
+        relation_id=relation_id,
     )
 
 
@@ -104,7 +113,7 @@ def _property(property_id: str) -> SafetyProperty:
 
 
 def known_violation_cases() -> tuple[KnownViolationCase, ...]:
-    """Return five stable synthetic relation failures, one for each starter property."""
+    """Return five stable synthetic property violations, one for each starter property."""
     red = _scenario("fixture-red", signal="red")
     red_follow_up = red.model_copy(update={"scenario_id": "fixture-red-follow-up"})
     no_hazard = _scenario("fixture-no-hazard")
@@ -117,13 +126,13 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
                     actor_type="hazard",
                     relevance="relevant",
                     lane_relation="ego_lane",
-                    distance_m=8,
+                    distance_m=8.0,
                 ),
             ),
             "description": "A newly authored synthetic road scenario with a relevant hazard.",
         }
     )
-    within_limit = _scenario("fixture-within-limit", speed_mph=20, speed_limit_mph=35)
+    within_limit = _scenario("fixture-within-limit", speed_mph=20.0, speed_limit_mph=35.0)
     overspeed = within_limit.model_copy(
         update={"scenario_id": "fixture-overspeed", "speed_mph": 50.0}
     )
@@ -135,7 +144,7 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
                 actor_type="pedestrian",
                 pedestrian_state="on_sidewalk",
                 lane_relation="sidewalk",
-                distance_m=6,
+                distance_m=6.0,
             ),
         ),
     )
@@ -162,30 +171,14 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
         KnownViolationCase(
             "red_signal_no_proceed",
             _property("red_signal_no_proceed"),
-            Counterfactual(
-                source=red,
-                follow_up=red_follow_up,
-                changed_fields=(
-                    FieldChange(
-                        path="scenario_id",
-                        from_value=red.scenario_id,
-                        to_value=red_follow_up.scenario_id,
-                    ),
-                ),
-                relation_id="red_signal",
-            ),
+            _counterfactual(red, red_follow_up, "red_signal"),
             Decision(action="proceed", risk="low", explanation="Intentional red-signal defect."),
             Decision(action="proceed", risk="low", explanation="Intentional red-signal defect."),
         ),
         KnownViolationCase(
             "hazard_non_aggression",
             _property("hazard_non_aggression"),
-            Counterfactual(
-                source=no_hazard,
-                follow_up=with_hazard,
-                changed_fields=(FieldChange(path="actors", from_value=[], to_value=["hazard-1"]),),
-                relation_id="add_relevant_hazard",
-            ),
+            _counterfactual(no_hazard, with_hazard, "add_relevant_hazard"),
             Decision(
                 action="reduce_speed", risk="high", explanation="Intentional baseline caution."
             ),
@@ -194,12 +187,7 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
         KnownViolationCase(
             "overspeed_risk_monotonicity",
             _property("overspeed_risk_monotonicity"),
-            Counterfactual(
-                source=within_limit,
-                follow_up=overspeed,
-                changed_fields=(FieldChange(path="speed_mph", from_value=20.0, to_value=50.0),),
-                relation_id="increase_speed",
-            ),
+            _counterfactual(within_limit, overspeed, "increase_speed"),
             Decision(
                 action="reduce_speed", risk="high", explanation="Intentional baseline caution."
             ),
@@ -210,18 +198,7 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
         KnownViolationCase(
             "crossing_pedestrian_caution",
             _property("crossing_pedestrian_caution"),
-            Counterfactual(
-                source=sidewalk,
-                follow_up=crossing,
-                changed_fields=(
-                    FieldChange(
-                        path="actors.pedestrian-1.pedestrian_state",
-                        from_value="on_sidewalk",
-                        to_value="crossing",
-                    ),
-                ),
-                relation_id="pedestrian_crossing",
-            ),
+            _counterfactual(sidewalk, crossing, "pedestrian_crossing"),
             Decision(
                 action="reduce_speed", risk="high", explanation="Intentional baseline caution."
             ),
@@ -230,18 +207,7 @@ def known_violation_cases() -> tuple[KnownViolationCase, ...]:
         KnownViolationCase(
             "paraphrase_invariance",
             _property("paraphrase_invariance"),
-            Counterfactual(
-                source=wording_a,
-                follow_up=wording_b,
-                changed_fields=(
-                    FieldChange(
-                        path="description",
-                        from_value=wording_a.description,
-                        to_value=wording_b.description,
-                    ),
-                ),
-                relation_id="semantic_paraphrase",
-            ),
+            _counterfactual(wording_a, wording_b, "semantic_paraphrase"),
             Decision(action="stop", risk="high", explanation="Intentional wording sensitivity."),
             Decision(action="proceed", risk="low", explanation="Intentional wording sensitivity."),
         ),

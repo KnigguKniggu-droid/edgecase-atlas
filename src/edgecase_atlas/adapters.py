@@ -266,6 +266,7 @@ class JsonlSubprocessAdapter:
         self._stderr_task: asyncio.Task[None] | None = None
         self._stderr = bytearray()
         self._pending_creations: set[asyncio.Task[asyncio.subprocess.Process]] = set()
+        self._creation_cleanup_futures: set[asyncio.Future[None]] = set()
         self._detached_cleanup_tasks: set[asyncio.Task[None]] = set()
 
     @property
@@ -342,8 +343,25 @@ class JsonlSubprocessAdapter:
                 cleanup_complete.set_result(None)
 
         def cleanup_finished(future: asyncio.Future[None]) -> None:
-            self._detached_cleanup_finished(future)
-            signal_cleanup_complete()
+            self._detached_cleanup_tasks.discard(cast(asyncio.Task[None], future))
+            if future.cancelled():
+                if not cleanup_complete.done():
+                    cleanup_complete.set_exception(
+                        AdapterProcessError("Detached subprocess cleanup was cancelled")
+                    )
+                return
+            try:
+                future.result()
+            except AdapterProcessError as error:
+                if not cleanup_complete.done():
+                    cleanup_complete.set_exception(error)
+            except Exception as error:
+                if not cleanup_complete.done():
+                    cleanup_failure = AdapterProcessError("Detached subprocess cleanup failed")
+                    cleanup_failure.__cause__ = error
+                    cleanup_complete.set_exception(cleanup_failure)
+            else:
+                signal_cleanup_complete()
 
         def creation_finished(
             _future: asyncio.Future[asyncio.subprocess.Process],
@@ -370,24 +388,19 @@ class JsonlSubprocessAdapter:
         try:
             process = await asyncio.shield(creation)
         except asyncio.CancelledError:
+            self._creation_cleanup_futures.add(cleanup_complete)
             state["abandoned"] = True
             creation_finished(creation)
             try:
                 await asyncio.shield(cleanup_complete)
             except asyncio.CancelledError:
                 raise
+            self._creation_cleanup_futures.discard(cleanup_complete)
             raise
         except OSError as error:
             raise AdapterProcessError("Subprocess target could not be started") from error
         self._register_process(process)
         return process
-
-    def _detached_cleanup_finished(self, future: asyncio.Future[None]) -> None:
-        self._detached_cleanup_tasks.discard(cast(asyncio.Task[None], future))
-        try:
-            future.result()
-        except (asyncio.CancelledError, AdapterError):
-            pass
 
     async def _reap_detached_process(self, process: asyncio.subprocess.Process) -> None:
         if process.stdin is not None:
@@ -440,12 +453,59 @@ class JsonlSubprocessAdapter:
         return bytes(self._stderr).decode("utf-8", errors="replace")
 
     async def aclose(self) -> None:
+        close_task = asyncio.create_task(self._aclose_serialized())
+        try:
+            await asyncio.shield(close_task)
+        except asyncio.CancelledError:
+            try:
+                await asyncio.shield(close_task)
+            except AdapterError:
+                pass
+            raise
+
+    async def _aclose_serialized(self) -> None:
         async with self._lock:
+            first_error: AdapterError | None = None
             try:
                 await self._abort_locked()
-            except asyncio.CancelledError:
-                await self._cleanup_after_cancellation()
-                raise
+            except AdapterError as error:
+                first_error = error
+            try:
+                await self._drain_background_lifecycle()
+            except AdapterError as error:
+                if first_error is None:
+                    first_error = error
+            if first_error is not None:
+                raise first_error
+
+    async def _drain_background_lifecycle(self) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.shutdown_timeout_seconds
+        while self._creation_cleanup_futures or self._detached_cleanup_tasks:
+            pending: set[asyncio.Future[None]] = set(self._creation_cleanup_futures)
+            pending.update(self._detached_cleanup_tasks)
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise AdapterProcessError(
+                    "Subprocess lifecycle cleanup exceeded the shutdown timeout"
+                )
+            done, not_done = await asyncio.wait(pending, timeout=remaining)
+            if not_done:
+                raise AdapterProcessError(
+                    "Subprocess lifecycle cleanup exceeded the shutdown timeout"
+                )
+            for future in done:
+                self._creation_cleanup_futures.discard(future)
+                try:
+                    future.result()
+                except asyncio.CancelledError as error:
+                    raise AdapterProcessError(
+                        "Subprocess lifecycle cleanup was cancelled"
+                    ) from error
+                except AdapterProcessError:
+                    raise
+                except Exception as error:
+                    raise AdapterProcessError("Subprocess lifecycle cleanup failed") from error
 
     async def __aenter__(self) -> JsonlSubprocessAdapter:
         return self

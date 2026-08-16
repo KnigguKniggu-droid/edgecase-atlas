@@ -17,10 +17,21 @@ METHODS = (
     "atlas",
 )
 PRIMARY_COMPARATOR = "diversity_criticality_search"
-CALL_KINDS = ("search", "retry", "confirmation", "shrink")
+TARGET_PHASES = (
+    "search",
+    "retry",
+    "adaptive_gate",
+    "shrink",
+    "terminal_audit",
+    "held_out_confirmation",
+)
+_EFFECTIVE_PHASES = frozenset(TARGET_PHASES) - {"retry"}
+_OUTCOMES = frozenset({"succeeded", "timeout", "crash", "malformed_output", "schema_error"})
+_TRIAL_OUTCOMES = frozenset({"violation", "not_violation", "unresolved"})
 _EXPERIMENT_FIELDS = frozenset(
     {
         "campaign_design_id",
+        "confirmation_design_id",
         "experiment_id",
         "partition",
         "property_pack_version",
@@ -28,6 +39,40 @@ _EXPERIMENT_FIELDS = frozenset(
         "target_build_id",
     }
 )
+_BASE_FIELDS = frozenset(
+    {"campaign_block_id", "event_type", "experiment", "method_id", "schema_version"}
+)
+_TARGET_FIELDS = _BASE_FIELDS | {
+    "attempt_id",
+    "evidence_id",
+    "ordinal",
+    "outcome",
+    "pair_role",
+    "phase",
+    "property_id",
+    "reducer_operation",
+    "relation_id",
+    "retry_for_phase",
+    "retry_of_attempt_id",
+    "seed",
+    "trial_outcome",
+}
+_GENERATOR_FIELDS = _BASE_FIELDS | {"ordinal"}
+_SUMMARY_FIELDS = _BASE_FIELDS | {"declared_target_calls"}
+_CERTIFICATE_FIELDS = _BASE_FIELDS | {
+    "adaptive_successes",
+    "adaptive_trials",
+    "certificate_id",
+    "held_out_successes",
+    "held_out_trials",
+    "minimization_status",
+    "property_id",
+    "reducer_vocabulary",
+    "relation_id",
+    "research_confirmed",
+    "signature",
+    "terminal_audit_complete",
+}
 
 
 class ResearchInputError(ValueError):
@@ -49,6 +94,7 @@ def load_research_jsonl(path: Path | str) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     frozen_experiment: dict[str, object] | None = None
     charged_identities: set[tuple[str, str, str, int]] = set()
+    attempt_ids: set[str] = set()
     for line_number, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
         if not line:
             raise ResearchInputError(f"Blank line {line_number} is not canonical JSONL")
@@ -66,9 +112,8 @@ def load_research_jsonl(path: Path | str) -> list[dict[str, object]]:
         elif experiment != frozen_experiment:
             raise ResearchInputError("Input contains mixed experiment metadata")
         if record["event_type"] in {"target_call", "generator_call"}:
-            ordinal = record.get("ordinal")
-            if not isinstance(ordinal, int) or isinstance(ordinal, bool) or ordinal < 1:
-                raise ResearchInputError(f"Line {line_number} has an invalid charged call ordinal")
+            ordinal = record["ordinal"]
+            assert isinstance(ordinal, int)
             identity = (
                 str(record["campaign_block_id"]),
                 str(record["method_id"]),
@@ -78,14 +123,32 @@ def load_research_jsonl(path: Path | str) -> list[dict[str, object]]:
             if identity in charged_identities:
                 raise ResearchInputError("Input contains a duplicate charged call identity")
             charged_identities.add(identity)
+        if record["event_type"] == "target_call":
+            attempt_id = str(record["attempt_id"])
+            if attempt_id in attempt_ids:
+                raise ResearchInputError("Input contains a duplicate target attempt identity")
+            attempt_ids.add(attempt_id)
         records.append(record)
     if not records:
         raise ResearchInputError("Research JSONL must contain at least one event")
+    _validate_retries(records)
     return records
 
 
 def _reject_nonfinite(value: str) -> None:
     raise ValueError(f"Non-finite number is prohibited: {value}")
+
+
+def _positive_ordinal(value: object, line_number: int) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ResearchInputError(f"Line {line_number} has an invalid charged call ordinal")
+    return value
+
+
+def _nonempty_string(value: object, line_number: int, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ResearchInputError(f"Line {line_number} has an invalid {field}")
+    return value
 
 
 def _validate_record(value: dict[str, Any], line_number: int) -> dict[str, object]:
@@ -96,41 +159,159 @@ def _validate_record(value: dict[str, Any], line_number: int) -> dict[str, objec
         raise ResearchInputError(f"Line {line_number} has invalid experiment metadata")
     if experiment["partition"] not in {"development", "pilot", "confirmatory"}:
         raise ResearchInputError(f"Line {line_number} has invalid experiment partition")
-    required = {
-        "campaign_block_id",
-        "event_type",
-        "experiment",
-        "method_id",
-        "schema_version",
-    }
-    if not required.issubset(value):
+    if experiment["confirmation_design_id"] != "fixed-20-unanimous-v1":
+        raise ResearchInputError(f"Line {line_number} has an unsupported confirmation design")
+    if not _BASE_FIELDS.issubset(value):
         raise ResearchInputError(f"Line {line_number} is missing research event fields")
     if value["schema_version"] != "atlas-research-event-v1":
         raise ResearchInputError(f"Line {line_number} has an unsupported schema version")
     if value["method_id"] not in METHODS:
         raise ResearchInputError(f"Line {line_number} has an unknown method")
-    if not isinstance(value["campaign_block_id"], str) or not value["campaign_block_id"]:
-        raise ResearchInputError(f"Line {line_number} has an invalid campaign block")
+    _nonempty_string(value["campaign_block_id"], line_number, "campaign block")
+
     event_type = value["event_type"]
     if event_type == "target_call":
-        if value.get("call_kind") not in CALL_KINDS:
-            raise ResearchInputError(f"Line {line_number} has an invalid target call kind")
-    elif event_type not in {"generator_call", "certificate", "coverage"}:
+        _validate_target_call(value, line_number)
+    elif event_type == "generator_call":
+        if frozenset(value) != _GENERATOR_FIELDS:
+            raise ResearchInputError(f"Line {line_number} has invalid generator-call fields")
+        _positive_ordinal(value["ordinal"], line_number)
+    elif event_type == "campaign_summary":
+        _validate_summary(value, line_number)
+    elif event_type == "certificate":
+        _validate_certificate(value, line_number)
+    elif event_type == "coverage":
+        if frozenset(value) != _BASE_FIELDS:
+            raise ResearchInputError(f"Line {line_number} has invalid coverage fields")
+    else:
         raise ResearchInputError(f"Line {line_number} has an unknown event type")
     return value
 
 
+def _validate_target_call(value: dict[str, Any], line_number: int) -> None:
+    if frozenset(value) != _TARGET_FIELDS:
+        raise ResearchInputError(f"Line {line_number} has invalid target-call fields")
+    _positive_ordinal(value["ordinal"], line_number)
+    for field in ("attempt_id", "evidence_id", "property_id", "relation_id"):
+        _nonempty_string(value[field], line_number, field.replace("_", " "))
+    if value["phase"] not in TARGET_PHASES:
+        raise ResearchInputError(f"Line {line_number} has an invalid target-call phase")
+    if value["pair_role"] not in {"source", "follow_up"}:
+        raise ResearchInputError(f"Line {line_number} has an invalid pair role")
+    if not isinstance(value["seed"], int) or isinstance(value["seed"], bool) or value["seed"] < 0:
+        raise ResearchInputError(f"Line {line_number} has an invalid seed")
+    if value["outcome"] not in _OUTCOMES:
+        raise ResearchInputError(f"Line {line_number} has an invalid target-call outcome")
+    if value["trial_outcome"] not in _TRIAL_OUTCOMES:
+        raise ResearchInputError(f"Line {line_number} has an invalid trial outcome")
+    if value["outcome"] == "succeeded" and value["trial_outcome"] == "unresolved":
+        raise ResearchInputError(f"Line {line_number} has an unresolved successful call")
+    if value["outcome"] != "succeeded" and value["trial_outcome"] != "unresolved":
+        raise ResearchInputError(f"Line {line_number} gives a failed call a trial result")
+    if value["phase"] == "retry":
+        _nonempty_string(value["retry_of_attempt_id"], line_number, "retry reference")
+        if value["retry_for_phase"] not in _EFFECTIVE_PHASES:
+            raise ResearchInputError(f"Line {line_number} has an invalid retry phase")
+    elif value["retry_of_attempt_id"] is not None or value["retry_for_phase"] is not None:
+        raise ResearchInputError(f"Line {line_number} has retry fields on a non-retry call")
+    reducer = value["reducer_operation"]
+    if value["phase"] == "terminal_audit":
+        _nonempty_string(reducer, line_number, "reducer operation")
+    elif reducer is not None:
+        raise ResearchInputError(f"Line {line_number} has an unexpected reducer operation")
+
+
+def _validate_summary(value: dict[str, Any], line_number: int) -> None:
+    if frozenset(value) != _SUMMARY_FIELDS:
+        raise ResearchInputError(f"Line {line_number} has invalid campaign-summary fields")
+    counts = value["declared_target_calls"]
+    expected_fields = frozenset(TARGET_PHASES) | {"total"}
+    if not isinstance(counts, dict) or frozenset(counts) != expected_fields:
+        raise ResearchInputError(f"Line {line_number} has invalid declared target call fields")
+    if any(
+        not isinstance(count, int) or isinstance(count, bool) or count < 0
+        for count in counts.values()
+    ):
+        raise ResearchInputError(f"Line {line_number} has invalid declared target call count")
+    if counts["total"] != sum(counts[phase] for phase in TARGET_PHASES):
+        raise ResearchInputError(f"Line {line_number} has inconsistent declared target call total")
+
+
+def _validate_certificate(value: dict[str, Any], line_number: int) -> None:
+    if frozenset(value) != _CERTIFICATE_FIELDS:
+        raise ResearchInputError(f"Line {line_number} has invalid certificate fields")
+    for field in ("certificate_id", "property_id", "relation_id", "minimization_status"):
+        _nonempty_string(value[field], line_number, field.replace("_", " "))
+    for field in (
+        "adaptive_successes",
+        "adaptive_trials",
+        "held_out_successes",
+        "held_out_trials",
+    ):
+        count = value[field]
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise ResearchInputError(f"Line {line_number} has an invalid {field}")
+    if value["adaptive_successes"] > value["adaptive_trials"]:
+        raise ResearchInputError(f"Line {line_number} has impossible adaptive counts")
+    if value["held_out_successes"] > value["held_out_trials"]:
+        raise ResearchInputError(f"Line {line_number} has impossible held-out counts")
+    if not isinstance(value["research_confirmed"], bool):
+        raise ResearchInputError(f"Line {line_number} has invalid confirmation status")
+    if not isinstance(value["terminal_audit_complete"], bool):
+        raise ResearchInputError(f"Line {line_number} has invalid terminal audit status")
+    reducers = value["reducer_vocabulary"]
+    if (
+        not isinstance(reducers, list)
+        or not reducers
+        or any(not isinstance(item, str) or not item for item in reducers)
+        or reducers != sorted(set(reducers))
+    ):
+        raise ResearchInputError(f"Line {line_number} has invalid reducer vocabulary")
+    if not isinstance(value["signature"], dict):
+        raise ResearchInputError(f"Line {line_number} has invalid signature")
+
+
+def _validate_retries(records: Sequence[Mapping[str, object]]) -> None:
+    attempts: dict[str, tuple[int, Mapping[str, object]]] = {}
+    for position, record in enumerate(records):
+        if record["event_type"] != "target_call":
+            continue
+        attempt_id = str(record["attempt_id"])
+        if record["phase"] == "retry":
+            reference = str(record["retry_of_attempt_id"])
+            prior = attempts.get(reference)
+            if prior is None or prior[0] >= position:
+                raise ResearchInputError("Retry must reference an earlier target attempt")
+            original = prior[1]
+            if original["phase"] == "retry" or original["outcome"] == "succeeded":
+                raise ResearchInputError("Retry must reference a failed non-retry attempt")
+            matching_fields = (
+                "campaign_block_id",
+                "method_id",
+                "evidence_id",
+                "property_id",
+                "relation_id",
+                "pair_role",
+                "seed",
+            )
+            if any(record[field] != original[field] for field in matching_fields):
+                raise ResearchInputError("Retry metadata differs from its original attempt")
+            if record["retry_for_phase"] != original["phase"]:
+                raise ResearchInputError("Retry phase differs from its original attempt")
+        attempts[attempt_id] = (position, record)
+
+
 def summarize_call_ledger(records: Sequence[Mapping[str, object]]) -> dict[str, object]:
-    """Count each attempted target call, including retries, confirmation, and shrinking."""
-    target_kinds = Counter(
-        str(record["call_kind"]) for record in records if record.get("event_type") == "target_call"
+    """Count every attempted target call, including failures, retries, and reductions."""
+    target_phases = Counter(
+        str(record["phase"]) for record in records if record.get("event_type") == "target_call"
     )
     return {
         "generator_calls_total": sum(
             record.get("event_type") == "generator_call" for record in records
         ),
-        "target_calls_by_kind": dict(sorted(target_kinds.items())),
-        "target_calls_total": sum(target_kinds.values()),
+        "target_calls_by_phase": dict(sorted(target_phases.items())),
+        "target_calls_total": sum(target_phases.values()),
     }
 
 

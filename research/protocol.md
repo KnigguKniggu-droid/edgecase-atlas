@@ -99,10 +99,13 @@ It is not the total experimental cost. A paired evaluation costs at least two ta
 source calls, follow-up calls, adaptive 4 of 5 checks, held-out confirmation, and shrink validation
 add calls. The final total must be derived from the complete ledger, never inferred from 6,000.
 
-Every target attempt is charged once as `search`, `retry`, `confirmation`, or `shrink`. The ledger
-also stores generator calls, tokens, cost, wall time, invalid proposals, repair attempts, timeouts,
-malformed outputs, and cost-cap failures. Total target-agent calls are the primary budget axis.
-Search-only efficiency and end-to-end monetary or compute cost are secondary axes.
+Every target attempt is charged once as `search`, `retry`, `adaptive_gate`, `shrink`,
+`terminal_audit`, or `held_out_confirmation`. Each method-campaign summary declares every
+phase count and the total. The analyzer reconciles those declarations against raw attempts,
+including failures and retries. The ledger also stores generator calls, tokens, cost, wall time,
+invalid proposals, repair attempts, timeouts, malformed outputs, and cost-cap failures. Total
+target-agent calls are the primary budget axis. Search-only efficiency and end-to-end monetary or
+compute cost are secondary axes.
 
 Three pilot campaign blocks may find implementation defects and bound conservative power inputs.
 Pilot events, signatures, parameter estimates chosen after unblinding, and outcomes never enter
@@ -129,10 +132,12 @@ campaign would create order dependence.
 ## Reproduction and reduction
 
 Search and shrinking use 4 of 5 violations as an adaptive engineering heuristic only. Discovery,
-shrink, and held-out confirmation seeds are disjoint. After all adaptive choices freeze, every
-retained certificate receives at least 20 paired reruns on fresh seeds or a preregistered sequential
-binomial design. Exact binomial intervals are reported. Research-confirmed status requires the
-preregistered lower confidence bound to exceed its operational floor.
+shrink, and held-out confirmation seeds are disjoint. The implemented
+`fixed-20-unanimous-v1` design requires at least 20 fresh paired reruns and a violation in every
+pair before `research_confirmed` is accepted. Exact binomial intervals may be reported but do not
+replace that machine gate. A sequential binomial design is reserved for future work and cannot be
+accepted until its stopping boundaries, operating characteristics, identifier, and validator are
+preregistered and implemented.
 
 The original and minimized pairs run on the same held-out confirmation seeds. Rejection traces and
 failed minimizations remain in the analysis. The eligible H4 set includes every independently

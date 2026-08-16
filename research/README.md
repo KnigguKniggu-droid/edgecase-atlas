@@ -31,9 +31,16 @@ line. Every line repeats identical frozen experiment metadata. Method and campai
 event fields because they vary within one experiment. Missing fields, mixed target builds,
 mixed partitions, mixed protocol versions, non-finite numbers, and noncanonical JSON are rejected.
 
-Target-call events use `call_kind` values `search`, `retry`, `confirmation`, or `shrink`.
-Every attempted target invocation receives one event even when it times out, crashes, returns
-malformed output, or is a retry. Generator calls remain separate because they are not target calls.
+Target-call events use `phase` values `search`, `retry`, `adaptive_gate`, `shrink`,
+`terminal_audit`, or `held_out_confirmation`. Each event identifies its certificate,
+property, relation, source or follow-up role, seed, outcome, and retry lineage. Every attempted
+target invocation receives one event even when it times out, crashes, returns malformed output,
+or is a retry. Each method and campaign block also declares per-phase and total counts, which the
+analyzer reconciles against raw events. Generator calls remain separate because they are not
+target calls. A one-minimal claim requires failure-preserving shrink evidence and a terminal audit
+over the frozen reducer vocabulary. `research_confirmed` additionally requires at least 20
+disjoint held-out paired reruns under `fixed-20-unanimous-v1`. Sequential confirmation remains
+future work until its stopping boundaries are preregistered and implemented.
 
 The faulty demonstration agent calibrates the oracle and end-to-end workflow only. It is excluded
 from H1 through H5. The 4 of 5 rule is an adaptive engineering gate. Research confirmation is a

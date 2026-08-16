@@ -39,8 +39,8 @@ required_freeze_artifacts:
   wall_time_budget: TBD
   cost_budget: TBD
   coverage_universe_digest: TBD
-  signature_equivalence_map: TBD
-  held_out_confirmation_design: TBD
+  signature_equivalence_map: "normalized-decision-labels-v1@sha256:ad56f62fb88ccca657fe9759591822ab22f3bcdab1b4fb6e3f77d907382c9e1b"
+  held_out_confirmation_design: fixed-20-unanimous-v1
   deviation_log: TBD
 excluded_from_alpha:
   - public-record downloads

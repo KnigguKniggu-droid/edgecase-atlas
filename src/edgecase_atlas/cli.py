@@ -204,6 +204,9 @@ async def _run_test(config: AtlasConfig, *, budget: int, seed: int) -> dict[str,
 
 
 async def _replay(config: AtlasConfig, certificate: FailureCertificate) -> ReproductionResult:
+    canonical_command = f"atlas replay certificates/{certificate.certificate_id}.json"
+    if certificate.replay_command != canonical_command:
+        raise ValueError("Certificate replay command is not canonical")
     adapter = _build_adapter(config)
     try:
         property_ = _property_by_id(certificate.property_id)

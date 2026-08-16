@@ -8,6 +8,7 @@ import ipaddress
 import json
 import os
 import re
+import threading
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import cast
@@ -19,7 +20,8 @@ from pydantic import ValidationError
 from edgecase_atlas.models import Decision, Scenario
 
 DecisionOutput = Decision | Mapping[str, object]
-DecisionCallable = Callable[[Scenario, int], DecisionOutput | Awaitable[DecisionOutput]]
+DecisionStageOutput = DecisionOutput | Awaitable[DecisionOutput]
+DecisionCallable = Callable[[Scenario, int], DecisionStageOutput]
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]{1,127}$")
 
 
@@ -97,23 +99,27 @@ def _validate_decision(value: object) -> Decision:
         ) from error
 
 
-def _close_late_awaitable(future: asyncio.Future[DecisionOutput]) -> None:
-    """Close a coroutine returned after its trusted sync caller timed out."""
+def _close_returned_awaitable(value: object) -> None:
+    if inspect.iscoroutine(value):
+        value.close()
+
+
+def _discard_sync_future(future: asyncio.Future[DecisionStageOutput]) -> None:
+    if not future.done() or future.cancelled():
+        return
     try:
         output = future.result()
-    except asyncio.CancelledError:
+    except BaseException:
         return
-    except Exception:
-        return
-    if inspect.iscoroutine(output):
-        output.close()
+    _close_returned_awaitable(output)
 
 
 class FunctionAdapter:
     """Run trusted Python callables under one end-to-end deadline.
 
     Trusted synchronous work cannot be forcibly terminated after a timeout because Python
-    worker threads remain alive. Use the subprocess adapter for untrusted or non-cooperative
+    worker threads remain alive. Atlas uses an explicit daemon thread so late trusted work does
+    not hold CLI event-loop shutdown. Use the subprocess adapter for untrusted or non-cooperative
     targets that require forcible termination.
     """
 
@@ -141,29 +147,74 @@ class FunctionAdapter:
         self.last_call_cost_usd = 0.0
         deadline = asyncio.get_running_loop().time() + self.timeout_seconds
         try:
+            output: DecisionStageOutput
             if inspect.iscoroutinefunction(self._target):
                 output = await self._await_before_deadline(self._target(scenario, seed), deadline)
             else:
-                sync_target = cast(Callable[[Scenario, int], DecisionOutput], self._target)
-                thread_task = asyncio.create_task(asyncio.to_thread(sync_target, scenario, seed))
-                try:
-                    output = await self._await_before_deadline(
-                        asyncio.shield(thread_task), deadline
-                    )
-                except TimeoutError:
-                    thread_task.add_done_callback(_close_late_awaitable)
-                    raise
+                output = await self._run_trusted_sync_before_deadline(scenario, seed, deadline)
                 if inspect.isawaitable(output):
-                    output = await self._await_before_deadline(
-                        cast(Awaitable[DecisionOutput], output), deadline
-                    )
+                    output = await self._await_before_deadline(output, deadline)
         except TimeoutError as error:
             raise AdapterTimeoutError("Python target exceeded its configured timeout") from error
         except asyncio.CancelledError:
             raise
+        except AdapterError:
+            raise
         except Exception as error:
             raise AdapterExecutionError("Python target execution failed") from error
         return _validate_decision(output)
+
+    async def _run_trusted_sync_before_deadline(
+        self,
+        scenario: Scenario,
+        seed: int,
+        deadline: float,
+    ) -> DecisionStageOutput:
+        loop = asyncio.get_running_loop()
+        result_future: asyncio.Future[DecisionStageOutput] = loop.create_future()
+        abandoned = threading.Event()
+        sync_target = self._target
+
+        def deliver(output: object, failed: bool) -> None:
+            if abandoned.is_set() or result_future.done():
+                _close_returned_awaitable(output)
+                return
+            if failed:
+                result_future.set_exception(AdapterExecutionError("Python target execution failed"))
+                return
+            result_future.set_result(cast(DecisionStageOutput, output))
+
+        def worker() -> None:
+            output: object = None
+            failed = False
+            try:
+                output = sync_target(scenario, seed)
+            except BaseException:
+                failed = True
+            try:
+                loop.call_soon_threadsafe(deliver, output, failed)
+            except RuntimeError:
+                _close_returned_awaitable(output)
+
+        try:
+            threading.Thread(
+                target=worker,
+                name="edgecase-atlas-trusted-target",
+                daemon=True,
+            ).start()
+        except RuntimeError as error:
+            raise AdapterExecutionError("Python target thread could not be started") from error
+
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            abandoned.set()
+            raise TimeoutError
+        try:
+            return await asyncio.wait_for(asyncio.shield(result_future), timeout=remaining)
+        except (TimeoutError, asyncio.CancelledError):
+            abandoned.set()
+            _discard_sync_future(result_future)
+            raise
 
     async def _await_before_deadline(
         self,
@@ -214,6 +265,8 @@ class JsonlSubprocessAdapter:
         self._lock = asyncio.Lock()
         self._stderr_task: asyncio.Task[None] | None = None
         self._stderr = bytearray()
+        self._pending_creations: set[asyncio.Task[asyncio.subprocess.Process]] = set()
+        self._detached_cleanup_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def process(self) -> asyncio.subprocess.Process | None:
@@ -280,20 +333,84 @@ class JsonlSubprocessAdapter:
                 stderr=asyncio.subprocess.PIPE,
             )
         )
+        self._pending_creations.add(creation)
+        state = {"abandoned": False, "cleanup_started": False}
+        cleanup_complete: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+
+        def signal_cleanup_complete() -> None:
+            if not cleanup_complete.done():
+                cleanup_complete.set_result(None)
+
+        def cleanup_finished(future: asyncio.Future[None]) -> None:
+            self._detached_cleanup_finished(future)
+            signal_cleanup_complete()
+
+        def creation_finished(
+            _future: asyncio.Future[asyncio.subprocess.Process],
+        ) -> None:
+            if not creation.done():
+                return
+            self._pending_creations.discard(creation)
+            if not state["abandoned"] or state["cleanup_started"]:
+                return
+            state["cleanup_started"] = True
+            if creation.cancelled():
+                signal_cleanup_complete()
+                return
+            try:
+                process = creation.result()
+            except OSError:
+                signal_cleanup_complete()
+                return
+            cleanup = asyncio.create_task(self._reap_detached_process(process))
+            self._detached_cleanup_tasks.add(cleanup)
+            cleanup.add_done_callback(cleanup_finished)
+
+        creation.add_done_callback(creation_finished)
         try:
             process = await asyncio.shield(creation)
         except asyncio.CancelledError:
+            state["abandoned"] = True
+            creation_finished(creation)
             try:
-                process = await asyncio.shield(creation)
-            except OSError:
+                await asyncio.shield(cleanup_complete)
+            except asyncio.CancelledError:
                 raise
-            self._register_process(process)
-            await self._cleanup_after_cancellation()
             raise
         except OSError as error:
             raise AdapterProcessError("Subprocess target could not be started") from error
         self._register_process(process)
         return process
+
+    def _detached_cleanup_finished(self, future: asyncio.Future[None]) -> None:
+        self._detached_cleanup_tasks.discard(cast(asyncio.Task[None], future))
+        try:
+            future.result()
+        except (asyncio.CancelledError, AdapterError):
+            pass
+
+    async def _reap_detached_process(self, process: asyncio.subprocess.Process) -> None:
+        if process.stdin is not None:
+            process.stdin.close()
+        if process.returncode is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                await asyncio.wait_for(process.wait(), timeout=self.shutdown_timeout_seconds)
+                return
+            except TimeoutError:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+        try:
+            await asyncio.wait_for(process.wait(), timeout=self.shutdown_timeout_seconds)
+        except TimeoutError as error:
+            raise AdapterProcessError(
+                "Detached subprocess could not be reaped within the shutdown timeout"
+            ) from error
 
     def _register_process(self, process: asyncio.subprocess.Process) -> None:
         self._process = process

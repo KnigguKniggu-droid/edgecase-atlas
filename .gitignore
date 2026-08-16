@@ -19,8 +19,10 @@ dist/
 runs/
 certificates/
 reports/
+traces/
 artifacts/
 .superpowers/
+.identity-scan-private-patterns
 
 *.gguf
 *.bin
@@ -32,4 +34,3 @@ research/data/raw/
 *Task5*
 *mentor*
 *institution*
-

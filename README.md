@@ -1,31 +1,59 @@
 # EdgeCase Atlas
 
-EdgeCase Atlas is an open-source developer tool for property-based red-team testing of AI driving-decision agents. It generates constraint-preserving counterfactuals, reruns stochastic failures, and shrinks each reproducible violation into a small causal certificate.
+EdgeCase Atlas is an open-source developer tool for property-based red-team testing of AI driving-decision agents. It generates constraint-preserving counterfactuals, repeats stochastic failures, and reduces each accepted violation to a 1-minimal reproducing contrast under the declared reducer set.
 
-The alpha targets structured text scenarios and simulated decision agents. It is not a vehicle controller, certification system, or statement of real-world safety.
+The 0.1 alpha targets structured-text scenarios and simulated decision agents. It is not a vehicle controller, certification system, legal-compliance tool, or statement of real-world safety. Every property is an editable operational assumption.
 
-## Planned alpha workflow
+## Implemented workflow
 
-1. Connect the included demonstration agent, a Python function, a JSONL subprocess, or an OpenAI-compatible model.
-2. Select editable operational-design-domain safety properties.
-3. Generate valid source and follow-up scenarios under a fixed budget.
-4. Require a failure to reproduce in at least four of five trials.
-5. Minimize the scenario while preserving validity and reproduction.
-6. Export JSON, JSONL, and standalone HTML evidence.
+1. Use the included faulty demonstration agent, a Python function, a persistent JSONL subprocess, or an explicitly enabled OpenAI-compatible endpoint.
+2. Select any of the five starter safety properties.
+3. Generate valid source and single-factor follow-up scenarios under a fixed seed and budget.
+4. Require at least four reproductions across five confirmation trials.
+5. Reduce actors, metadata, attributes, numeric deltas, and descriptions while preserving typed constraints and reproduction.
+6. Export canonical JSON, append-only JSONL, and standalone HTML evidence with replay commands.
 
-## Development
+The included no-key Streamlit application exposes only curated synthetic examples and the faulty fixture. It does not expose subprocesses, arbitrary HTTP, uploads, or user code execution.
+
+## Quick start
 
 EdgeCase Atlas requires Python 3.12.
 
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\atlas.exe init
+.\.venv\Scripts\atlas.exe validate atlas.yaml
+.\.venv\Scripts\atlas.exe test --config atlas.yaml --budget 1 --seed 42
 ```
 
-The CLI surface is `atlas init`, `atlas validate`, `atlas test`, `atlas replay`, and `atlas report`.
+The test command writes a run document, JSONL trace, standalone HTML report, and at least one certificate for the included faulty fixture. Replay the emitted certificate path, then regenerate the offline report from the emitted run path:
+
+```powershell
+.\.venv\Scripts\atlas.exe replay certificates\CASE.json
+.\.venv\Scripts\atlas.exe report runs\RUN.json --format html
+```
+
+Run the no-key local application with:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app\streamlit_app.py --server.headless=true
+```
+
+## Release verification
+
+The release verifier enforces Python 3.12, identity and secret scanning, Ruff, mypy, pytest, no-key CLI and Streamlit smoke tests, deterministic fixture and synthetic-pack checksums, and a package build:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\verify_release.py
+```
+
+Generated runs, certificates, traces, reports, secrets, private patterns, raw imports, and model weights remain ignored. No public push, deployment, outreach, or competition submission is performed by the verifier.
+
+## Research status
+
+The research protocol is preregistered as a planned study. Benchmark metrics, tester results, and launch claims remain `TBD` until their declared evidence exists. See `research/README.md` and `docs/evidence-ledger.md`.
 
 ## License
 
 Code is licensed under Apache-2.0. Original synthetic scenarios and annotations are licensed under CC BY 4.0 as described in `DATA_LICENSE.md`.
-

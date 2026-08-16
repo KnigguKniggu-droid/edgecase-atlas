@@ -215,7 +215,8 @@ def _validate_target_call(value: dict[str, Any], line_number: int) -> None:
     elif value["retry_of_attempt_id"] is not None or value["retry_for_phase"] is not None:
         raise ResearchInputError(f"Line {line_number} has retry fields on a non-retry call")
     reducer = value["reducer_operation"]
-    if value["phase"] == "terminal_audit":
+    effective_phase = value["retry_for_phase"] if value["phase"] == "retry" else value["phase"]
+    if effective_phase == "terminal_audit":
         _nonempty_string(reducer, line_number, "reducer operation")
     elif reducer is not None:
         raise ResearchInputError(f"Line {line_number} has an unexpected reducer operation")
@@ -287,6 +288,7 @@ def _validate_retries(records: Sequence[Mapping[str, object]]) -> None:
                 raise ResearchInputError("Retry must reference a failed non-retry attempt")
             matching_fields = (
                 "campaign_block_id",
+                "reducer_operation",
                 "method_id",
                 "evidence_id",
                 "property_id",

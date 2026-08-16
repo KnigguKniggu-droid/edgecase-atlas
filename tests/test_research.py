@@ -247,6 +247,57 @@ def test_call_ledger_counts_every_target_call_phase_and_retry(tmp_path: Path) ->
     assert summary["generator_calls_total"] == 1
 
 
+def test_terminal_audit_retry_preserves_reducer_and_reconciles_campaign(
+    tmp_path: Path,
+) -> None:
+    from research.analysis import analyze_campaigns
+    from research.baselines import ResearchInputError, load_research_jsonl
+
+    records: list[dict[str, object]] = []
+    for method_id in METHODS:
+        campaign = _confirmed_campaign(method_id)
+        if method_id == "atlas":
+            failed = next(
+                record
+                for record in campaign
+                if record["event_type"] == "target_call"
+                and record["phase"] == "terminal_audit"
+                and record["pair_role"] == "source"
+                and record["reducer_operation"] == "remove_actor"
+            )
+            failed["outcome"] = "timeout"
+            failed["trial_outcome"] = "unresolved"
+            retry = _target_call(
+                "atlas",
+                "retry",
+                59,
+                pair_role="source",
+                seed=201,
+                trial_outcome="not_violation",
+                retry_of_attempt_id=str(failed["attempt_id"]),
+                retry_for_phase="terminal_audit",
+                reducer_operation="remove_actor",
+            )
+            campaign.insert(-2, retry)
+            summary = campaign[-1]
+            summary["declared_target_calls"] = dict(
+                summary["declared_target_calls"], retry=1, total=59
+            )
+        records.extend(campaign)
+
+    path = tmp_path / "events.jsonl"
+    _write_jsonl(path, records)
+    result = analyze_campaigns(load_research_jsonl(path), expected_campaign_blocks=1)
+
+    atlas = next(row for row in result["campaigns"] if row["method_id"] == "atlas")
+    assert atlas["target_calls_total"] == 59
+    assert atlas["unique_confirmed_signatures"] == 1
+    retry["reducer_operation"] = "remove_attribute"
+    _write_jsonl(path, records)
+    with pytest.raises(ResearchInputError, match="metadata differs"):
+        load_research_jsonl(path)
+
+
 def test_analysis_requires_ledger_proven_confirmation_and_reconciles_counts(
     tmp_path: Path,
 ) -> None:

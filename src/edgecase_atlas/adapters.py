@@ -454,14 +454,18 @@ class JsonlSubprocessAdapter:
 
     async def aclose(self) -> None:
         close_task = asyncio.create_task(self._aclose_serialized())
-        try:
-            await asyncio.shield(close_task)
-        except asyncio.CancelledError:
+        cancellation_requests = 0
+        while not close_task.done():
             try:
                 await asyncio.shield(close_task)
-            except AdapterError:
-                pass
-            raise
+            except asyncio.CancelledError:
+                cancellation_requests += 1
+        try:
+            close_task.result()
+        except asyncio.CancelledError as error:
+            raise AdapterProcessError("Subprocess close operation was cancelled") from error
+        if cancellation_requests:
+            raise asyncio.CancelledError()
 
     async def _aclose_serialized(self) -> None:
         async with self._lock:

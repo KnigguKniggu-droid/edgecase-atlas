@@ -19,11 +19,12 @@ PUBLIC_BUDGET_MAX = 25
 PUBLIC_TEXT_MAX_CHARS = 1_000
 PUBLIC_SEED_MAX = 2**31 - 1
 
-RunStatus = Literal["empty", "running", "success", "no_failure", "adapter_error"]
+RunStatus = Literal["empty", "running", "success", "no_failure", "input_error", "adapter_error"]
 
 
 class DemoRequest(NamedTuple):
     properties: tuple[SafetyProperty, ...]
+    sample_property_id: str
     seed: int
     budget: int
     custom_text: str
@@ -38,7 +39,12 @@ class DemoArtifacts(NamedTuple):
 
 
 def validate_public_request(
-    *, property_ids: Sequence[str], seed: int, budget: int, custom_text: str
+    *,
+    property_ids: Sequence[str],
+    sample_property_id: str,
+    seed: int,
+    budget: int,
+    custom_text: str,
 ) -> DemoRequest:
     """Revalidate every browser-supplied value before running the public fixture."""
     if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed <= PUBLIC_SEED_MAX:
@@ -54,12 +60,21 @@ def validate_public_request(
 
     by_id = {item.property_id: item for item in STARTER_PROPERTY_PACK}
     requested_ids = tuple(property_ids)
-    if not requested_ids or len(requested_ids) != len(set(requested_ids)):
-        raise ValueError("Select at least one unique safety assumption.")
+    if not isinstance(sample_property_id, str) or sample_property_id not in by_id:
+        raise ValueError("Select a curated synthetic example from the public pack.")
+    if not requested_ids:
+        raise ValueError("Select at least one safety assumption.")
+    if len(requested_ids) != len(set(requested_ids)):
+        raise ValueError("Select unique safety assumptions.")
     if any(property_id not in by_id for property_id in requested_ids):
         raise ValueError("The public demonstration only supports the starter property pack.")
+    ordered_ids = (
+        sample_property_id,
+        *(property_id for property_id in requested_ids if property_id != sample_property_id),
+    )
     return DemoRequest(
-        tuple(by_id[property_id] for property_id in requested_ids),
+        tuple(by_id[property_id] for property_id in ordered_ids),
+        sample_property_id,
         seed,
         budget,
         custom_text.strip(),
@@ -84,6 +99,7 @@ async def build_demo_artifacts(request: DemoRequest) -> DemoArtifacts:
     document = run_document(run)
     document["demo_input"] = {
         "adapter_id": PUBLIC_ADAPTER_ID,
+        "sample_property_id": request.sample_property_id,
         "custom_text": request.custom_text,
         "note": (
             "Optional text is stored only as synthetic session context. "
@@ -120,6 +136,10 @@ def status_copy(status: RunStatus | str, error: BaseException | None = None) -> 
         "no_failure": (
             "No reproducible failure found.",
             "Try another assumption, seed, or larger budget. This is not evidence of safety.",
+        ),
+        "input_error": (
+            "Check the demonstration inputs.",
+            "Select at least one safety assumption and use the public bounds.",
         ),
         "adapter_error": (
             "The demonstration could not finish.",

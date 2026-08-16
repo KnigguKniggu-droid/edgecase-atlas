@@ -1,6 +1,6 @@
 [theme]
 base = "dark"
-primaryColor = "#7CFF6B"
+primaryColor = "#1D4ED8"
 backgroundColor = "#0B0F14"
 secondaryBackgroundColor = "#151C24"
 textColor = "#F1F5F9"
@@ -14,6 +14,9 @@ headless = true
 maxUploadSize = 1
 
 [client]
-showErrorDetails = false
+showErrorDetails = "none"
 toolbarMode = "viewer"
+
+[browser]
+gatherUsageStats = false
 

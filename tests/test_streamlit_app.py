@@ -6,6 +6,7 @@ import ast
 import asyncio
 import importlib
 import json
+import tomllib
 from pathlib import Path
 from types import ModuleType
 
@@ -14,10 +15,36 @@ from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).parents[1] / "app" / "streamlit_app.py"
 UI_PATH = Path(__file__).parents[1] / "app" / "ui.py"
+STREAMLIT_CONFIG_PATH = Path(__file__).parents[1] / ".streamlit" / "config.toml"
 
 
 def _load_app_module() -> ModuleType:
     return importlib.import_module("app.ui")
+
+
+def _relative_luminance(hex_color: str) -> float:
+    channels = [int(hex_color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [
+        channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(first: str, second: str) -> float:
+    lighter, darker = sorted(
+        (_relative_luminance(first), _relative_luminance(second)), reverse=True
+    )
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def test_streamlit_config_disables_telemetry_hides_errors_and_meets_button_contrast() -> None:
+    """Regressing privacy settings or button contrast must fail deployment configuration."""
+    config = tomllib.loads(STREAMLIT_CONFIG_PATH.read_text(encoding="utf-8"))
+
+    assert config["browser"]["gatherUsageStats"] is False
+    assert config["client"]["showErrorDetails"] == "none"
+    assert _contrast_ratio(config["theme"]["primaryColor"], "#FFFFFF") >= 4.5
 
 
 def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None:
@@ -59,36 +86,61 @@ def test_public_request_revalidates_text_budget_seed_and_property_allowlist() ->
 
     request = app.validate_public_request(
         property_ids=("red_signal_no_proceed",),
+        sample_property_id="red_signal_no_proceed",
         seed=42,
         budget=1,
         custom_text="  Synthetic context only.  ",
     )
     assert request.custom_text == "Synthetic context only."
     assert tuple(item.property_id for item in request.properties) == ("red_signal_no_proceed",)
+    assert request.sample_property_id == "red_signal_no_proceed"
 
     invalid_requests = (
-        {"property_ids": (), "seed": 42, "budget": 1, "custom_text": ""},
-        {"property_ids": ("unknown",), "seed": 42, "budget": 1, "custom_text": ""},
+        {
+            "property_ids": (),
+            "sample_property_id": "red_signal_no_proceed",
+            "seed": 42,
+            "budget": 1,
+            "custom_text": "",
+        },
+        {
+            "property_ids": ("unknown",),
+            "sample_property_id": "red_signal_no_proceed",
+            "seed": 42,
+            "budget": 1,
+            "custom_text": "",
+        },
         {
             "property_ids": ("red_signal_no_proceed",),
+            "sample_property_id": "C:\\private\\sample",
+            "seed": 42,
+            "budget": 1,
+            "custom_text": "",
+        },
+        {
+            "property_ids": ("red_signal_no_proceed",),
+            "sample_property_id": "red_signal_no_proceed",
             "seed": -1,
             "budget": 1,
             "custom_text": "",
         },
         {
             "property_ids": ("red_signal_no_proceed",),
+            "sample_property_id": "red_signal_no_proceed",
             "seed": 42,
             "budget": 0,
             "custom_text": "",
         },
         {
             "property_ids": ("red_signal_no_proceed",),
+            "sample_property_id": "red_signal_no_proceed",
             "seed": 42,
             "budget": 26,
             "custom_text": "",
         },
         {
             "property_ids": ("red_signal_no_proceed",),
+            "sample_property_id": "red_signal_no_proceed",
             "seed": 42,
             "budget": 1,
             "custom_text": "x" * 1001,
@@ -116,6 +168,7 @@ def test_no_key_demo_builds_json_jsonl_and_standalone_html_downloads() -> None:
     app = _load_app_module()
     request = app.validate_public_request(
         property_ids=("red_signal_no_proceed",),
+        sample_property_id="hazard_non_aggression",
         seed=42,
         budget=1,
         custom_text="A synthetic intersection context.",
@@ -127,6 +180,8 @@ def test_no_key_demo_builds_json_jsonl_and_standalone_html_downloads() -> None:
 
     assert document["schema_version"] == "atlas-run-v1"
     assert document["demo_input"]["custom_text"] == "A synthetic intersection context."
+    assert document["demo_input"]["sample_property_id"] == "hazard_non_aggression"
+    assert document["certificates"][0]["property"]["property_id"] == "hazard_non_aggression"
     assert len(document["certificates"]) >= 1
     assert events[0]["event_type"] == "run_started"
     assert events[-1]["event_type"] == "run_completed"
@@ -146,6 +201,7 @@ def test_status_copy_covers_every_public_run_state_without_leaking_errors() -> N
     assert app.status_copy("running")[0] == "Running counterfactual checks."
     assert app.status_copy("success")[0] == "Reproducible failure found."
     assert app.status_copy("no_failure")[0] == "No reproducible failure found."
+    assert app.status_copy("input_error")[0] == "Check the demonstration inputs."
     title, detail = app.status_copy("adapter_error", RuntimeError("secret-token"))
     assert title == "The demonstration could not finish."
     assert "secret-token" not in detail
@@ -211,3 +267,52 @@ def test_multiple_certificates_remain_individually_inspectable() -> None:
     assert not app.exception
     certificate_picker = next(item for item in app.selectbox if item.label == "Failure certificate")
     assert len(certificate_picker.options) == 2
+
+
+def test_empty_property_selection_is_reported_as_input_validation() -> None:
+    """Submitting no safety assumptions must not be mislabeled as an adapter failure."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app.multiselect[0].set_value([])
+
+    run_button = next(item for item in app.button if item.label == "Run demonstration")
+    app = run_button.click().run(timeout=30)
+
+    assert not app.exception
+    assert any("Select at least one safety assumption" in item.value for item in app.error)
+    assert all("could not finish" not in item.value.lower() for item in app.error)
+
+
+def test_tampered_preview_state_is_reset_without_traceback_or_value_leak() -> None:
+    """A forged session-state preview ID must be validated before dictionary indexing."""
+    injected_value = r"C:\private\fixture-secret"
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    app.session_state["atlas_sample_input"] = injected_value
+
+    app = app.run(timeout=30)
+
+    assert not app.exception
+    assert any("reset to a safe default" in item.value for item in app.warning)
+    rendered = " ".join(
+        str(getattr(item, "value", ""))
+        for element_type in ("warning", "error", "caption", "info", "exception")
+        for item in app.get(element_type)
+    )
+    assert injected_value not in rendered
+    assert "streamlit_app.py" not in rendered
+
+
+def test_curated_sample_selection_changes_the_executed_property() -> None:
+    """The curated selector must affect the real run rather than only its preview."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    sample_picker = next(
+        item for item in app.selectbox if item.label == "Curated synthetic example"
+    )
+    sample_picker.set_value("hazard_non_aggression")
+
+    run_button = next(item for item in app.button if item.label == "Run demonstration")
+    app = run_button.click().run(timeout=30)
+
+    assert not app.exception
+    assert any(
+        item.value == "Relevant hazards cannot increase aggression" for item in app.subheader
+    )

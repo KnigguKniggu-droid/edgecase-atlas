@@ -243,6 +243,18 @@ st.info(
 
 property_titles = {item.property_id: item.title for item in STARTER_PROPERTY_PACK}
 curated_cases = {item.property_id: item for item in known_violation_cases()}
+default_sample_property_id = next(iter(curated_cases))
+stored_sample_property_id = st.session_state.get("atlas_sample_input")
+sample_state_was_reset = stored_sample_property_id is not None and not (
+    isinstance(stored_sample_property_id, str) and stored_sample_property_id in curated_cases
+)
+if sample_state_was_reset:
+    st.session_state["atlas_sample_input"] = default_sample_property_id
+    st.warning(
+        "The curated example selection was reset to a safe default.",
+        icon=":material/shield:",
+    )
+
 with st.form("atlas_demo_form", border=True):
     st.subheader("Configure one bounded demonstration")
     sample_property_id = st.selectbox(
@@ -250,7 +262,10 @@ with st.form("atlas_demo_form", border=True):
         options=tuple(curated_cases),
         format_func=lambda value: property_titles[value],
         key="atlas_sample_input",
-        help="Preview a newly authored synthetic before-and-after pair.",
+        help=(
+            "Preview a newly authored synthetic pair. "
+            "Its matching assumption is run first within the selected budget."
+        ),
     )
     selected_property_ids = st.multiselect(
         "Safety assumptions",
@@ -312,35 +327,45 @@ if submitted:
     try:
         request = validate_public_request(
             property_ids=selected_property_ids,
+            sample_property_id=sample_property_id,
             seed=seed,
             budget=budget,
             custom_text=custom_text,
         )
-        st.session_state["atlas_run_status"] = "running"
-        st.session_state["atlas_run_error"] = None
-        running_title, running_detail = status_copy("running")
-        with st.status(
-            running_title,
-            expanded=True,
-            state="running",
-        ) as run_status:
-            st.write(running_detail)
-            artifacts = asyncio.run(build_demo_artifacts(request))
-            run_status.update(label="Demonstration complete", state="complete", expanded=False)
-        st.session_state["atlas_run_artifacts"] = artifacts
-        st.session_state["atlas_run_status"] = (
-            "success" if artifacts.run.certificates else "no_failure"
-        )
-    except Exception as error:
+    except ValueError:
         st.session_state["atlas_run_artifacts"] = None
-        st.session_state["atlas_run_status"] = "adapter_error"
-        st.session_state["atlas_run_error"] = error.__class__.__name__
+        st.session_state["atlas_run_status"] = "input_error"
+        st.session_state["atlas_run_error"] = None
+    else:
+        try:
+            st.session_state["atlas_run_status"] = "running"
+            st.session_state["atlas_run_error"] = None
+            running_title, running_detail = status_copy("running")
+            with st.status(
+                running_title,
+                expanded=True,
+                state="running",
+            ) as run_status:
+                st.write(running_detail)
+                artifacts = asyncio.run(build_demo_artifacts(request))
+                run_status.update(label="Demonstration complete", state="complete", expanded=False)
+            st.session_state["atlas_run_artifacts"] = artifacts
+            st.session_state["atlas_run_status"] = (
+                "success" if artifacts.run.certificates else "no_failure"
+            )
+        except Exception:
+            st.session_state["atlas_run_artifacts"] = None
+            st.session_state["atlas_run_status"] = "adapter_error"
+            st.session_state["atlas_run_error"] = None
 
 current_status = cast(RunStatus, st.session_state["atlas_run_status"])
 stored_artifacts = st.session_state["atlas_run_artifacts"]
 if current_status == "empty":
     empty_title, empty_detail = status_copy("empty")
     st.info(f"{empty_title} {empty_detail}", icon=":material/science:")
+elif current_status == "input_error":
+    input_title, input_detail = status_copy("input_error")
+    st.error(f"{input_title} {input_detail}", icon=":material/warning:")
 elif current_status == "adapter_error":
     error_title, error_detail = status_copy("adapter_error")
     st.error(f"{error_title} {error_detail}", icon=":material/error:")

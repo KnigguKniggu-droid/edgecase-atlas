@@ -1,0 +1,54 @@
+schema_version: atlas-reproducibility-v1
+research_title: Constraint-Guided Counterfactual Fuzzing for Reason-Responsive Driving Agents
+results_status: TBD
+protocol_version: 1.0.0-draft
+software_version: 0.1.0
+python_version: "3.12"
+property_pack_version: starter-v0.1
+primary_comparator: diversity_criticality_search
+campaign_blocks_planned: 12
+methods:
+  - random_valid_sampling
+  - fixed_metamorphic_templates
+  - unguided_llm_generation
+  - diversity_criticality_search
+  - atlas
+synthetic_seed_pack:
+  path: research/data/synthetic_seed_pack.jsonl
+  records: 100
+  license: CC BY 4.0
+  provenance: Newly written deterministic synthetic scenarios only.
+  generator: research/generate_seed_pack.py
+  sha256: f54ce18cc0fc592735ebba2cc5c2e7292496722a9468c1e05bfabcd6807ebe27
+partitions:
+  development: 20
+  pilot: 20
+  confirmatory: 60
+required_freeze_artifacts:
+  repository_commit: TBD
+  environment_lock: TBD
+  target_build_id: TBD
+  target_prompt_digest: TBD
+  decoding_configuration: TBD
+  adapter_configuration_digest: TBD
+  reset_protocol: TBD
+  campaign_order_randomization: TBD
+  power_analysis: TBD
+  charged_call_budget: TBD
+  generator_budget: TBD
+  wall_time_budget: TBD
+  cost_budget: TBD
+  coverage_universe_digest: TBD
+  signature_equivalence_map: TBD
+  held_out_confirmation_design: TBD
+  deviation_log: TBD
+excluded_from_alpha:
+  - public-record downloads
+  - private scenarios
+  - model weights
+  - MetaDrive execution
+  - CARLA execution
+  - physical vehicle control
+  - OSMO VDA
+  - AnomalyGen
+  - Kubernetes provisioning

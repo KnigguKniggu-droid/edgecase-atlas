@@ -80,7 +80,8 @@ def test_release_verifier_requires_python_312_and_all_gates(tmp_path: Path) -> N
     assert any("pytest -q" in command for command in joined)
     assert any("scripts/identity_scan.py" in command for command in joined)
     assert any("scripts/smoke_test.py" in command for command in joined)
-    assert any("pip wheel . --no-deps --no-build-isolation" in command for command in joined)
+    assert any("pip wheel . --no-deps" in command for command in joined)
+    assert all("--no-build-isolation" not in command for command in joined)
 
 
 def test_release_configuration_and_docs_state_implemented_boundaries() -> None:

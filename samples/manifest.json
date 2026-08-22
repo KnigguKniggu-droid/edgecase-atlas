@@ -1,0 +1,13 @@
+{
+  "schema_version": "atlas-sample-manifest-v1",
+  "provenance": "Newly generated from the public synthetic faulty fixture with seed 42 and budget 1.",
+  "license": "CC BY 4.0",
+  "certificate": {
+    "path": "samples/sample-certificate.json",
+    "sha256": "7c2bcd5319cc82143229fd91247a8ca852cc96af2935b4d5e101398b9d7f52f2"
+  },
+  "report": {
+    "path": "samples/sample-report.html",
+    "sha256": "e86aa4c71083ef8a384d136f83dd8503c85e03795bc24a8ba64cc3603090f3a9"
+  }
+}

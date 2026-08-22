@@ -71,7 +71,7 @@ async def test_report_contains_complete_reproducibility_fields(tmp_path: Path) -
         assert expected in html
 
 
-def test_identical_cli_run_reuses_ids_and_appends_complete_jsonl(
+def test_identical_cli_run_reuses_ids_and_replaces_complete_jsonl(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -98,12 +98,9 @@ def test_identical_cli_run_reuses_ids_and_appends_complete_jsonl(
         == first_certificate_id
     )
     all_events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
-    assert len(all_events) == 2 * len(first_events)
-    assert [item["event_type"] for item in all_events[: len(first_events)]] == [
-        item["event_type"] for item in all_events[len(first_events) :]
-    ]
-    assert sum(item["event_type"] == "run_started" for item in all_events) == 2
-    assert sum(item["event_type"] == "run_completed" for item in all_events) == 2
+    assert all_events == first_events
+    assert sum(item["event_type"] == "run_started" for item in all_events) == 1
+    assert sum(item["event_type"] == "run_completed" for item in all_events) == 1
 
 
 def test_report_rejects_run_id_path_traversal(

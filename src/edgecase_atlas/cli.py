@@ -50,11 +50,12 @@ from edgecase_atlas.models import Counterfactual, FailureCertificate
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK, SafetyProperty
 from edgecase_atlas.reporting import render_html_report
 from edgecase_atlas.serialization import (
-    append_jsonl,
     load_json,
     run_document,
     trace_events,
+    validate_run_document,
     write_canonical_json,
+    write_jsonl,
 )
 
 _RUN_ID = re.compile(r"^run-[0-9a-f]{16}$")
@@ -162,7 +163,7 @@ def report_command(
     if format_name.casefold() != "html":
         _fail("Only --format html is supported in alpha 0.1.")
     try:
-        document = load_json(run_path)
+        document = validate_run_document(load_json(run_path))
         if not isinstance(document, Mapping):
             raise TypeError("Run document must be a mapping")
         metadata = document.get("metadata")
@@ -189,7 +190,7 @@ async def _run_test(config: AtlasConfig, *, budget: int, seed: int) -> dict[str,
     document = run_document(run)
     run_id = run.metadata.run_id
     run_path = write_canonical_json(Path("runs") / f"{run_id}.json", document)
-    trace_path = append_jsonl(Path("traces") / f"{run_id}.jsonl", trace_events(run))
+    trace_path = write_jsonl(Path("traces") / f"{run_id}.jsonl", trace_events(run))
     for item in run.certificates:
         write_canonical_json(
             Path("certificates") / f"{item.certificate.certificate_id}.json", item.certificate

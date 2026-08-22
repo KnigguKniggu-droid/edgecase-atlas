@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import fields, is_dataclass
@@ -12,7 +13,15 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from edgecase_atlas.engine import RunResult
+from edgecase_atlas.engine import (
+    _COVERAGE_ESTIMAND,
+    RunResult,
+    _digest_json,
+    _engine_config_hash,
+    _property_pack_digest,
+    recompute_certificate_id,
+)
+from edgecase_atlas.models import FailureCertificate
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK
 
 _PROPERTIES = {item.property_id: item for item in STARTER_PROPERTY_PACK}
@@ -74,6 +83,19 @@ def append_jsonl(path: Path | str, events: Sequence[Mapping[str, object]]) -> Pa
             stream.write(canonical_json(event))
             stream.write("\n")
         stream.flush()
+    return output
+
+
+def write_jsonl(path: Path | str, events: Sequence[Mapping[str, object]]) -> Path:
+    """Atomically replace one execution trace so deterministic run IDs never mix runs."""
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.tmp")
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        for event in events:
+            stream.write(canonical_json(event) + "\n")
+        stream.flush()
+    temporary.replace(output)
     return output
 
 
@@ -146,6 +168,212 @@ def run_document(run: RunResult) -> dict[str, object]:
         },
         "certificates": certificates,
     }
+
+
+def validate_run_document(value: object) -> Mapping[str, object]:
+    """Reject forged or internally inconsistent evidence before report rendering."""
+    if not isinstance(value, Mapping) or value.get("schema_version") != "atlas-run-v1":
+        raise ValueError("Unsupported Atlas run artifact")
+    metadata = value.get("metadata")
+    property_pack = value.get("property_pack")
+    ledger = value.get("call_ledger")
+    certificates = value.get("certificates")
+    if not isinstance(metadata, Mapping) or not isinstance(ledger, Mapping):
+        raise ValueError("Run metadata and ledger must be objects")
+    if not isinstance(property_pack, list) or not isinstance(certificates, list):
+        raise ValueError("Property pack and certificates must be arrays")
+    property_ids = metadata.get("property_ids")
+    if not isinstance(property_ids, list) or not all(
+        isinstance(item, str) for item in property_ids
+    ):
+        raise ValueError("Run property IDs are invalid")
+    if set(metadata) != {
+        "run_id",
+        "seed",
+        "candidate_budget",
+        "held_out_confirmation_seed_stream",
+        "executed_seed_streams",
+        "property_ids",
+        "property_pack_digest",
+        "engine_config_hash",
+        "confirmation_note",
+    }:
+        raise ValueError("Run metadata fields are not canonical")
+    if not isinstance(metadata["run_id"], str) or not re.fullmatch(
+        r"run-[0-9a-f]{16}", metadata["run_id"]
+    ):
+        raise ValueError("Run ID is not canonical")
+    if (
+        not isinstance(metadata["seed"], int)
+        or isinstance(metadata["seed"], bool)
+        or metadata["seed"] < 0
+    ):
+        raise ValueError("Run seed is invalid")
+    if (
+        not isinstance(metadata["candidate_budget"], int)
+        or not 1 <= metadata["candidate_budget"] <= 100_000
+    ):
+        raise ValueError("Run budget is invalid")
+    properties = tuple(
+        _PROPERTIES[property_id] for property_id in property_ids if property_id in _PROPERTIES
+    )
+    if metadata["property_pack_digest"] != _property_pack_digest(properties):
+        raise ValueError("Run property-pack digest is inconsistent")
+    if metadata["engine_config_hash"] != _engine_config_hash():
+        raise ValueError("Run engine configuration is inconsistent")
+    expected_pack = []
+    for property_id in property_ids:
+        item = _PROPERTIES.get(property_id)
+        if item is None:
+            raise ValueError("Run references an unknown property")
+        expected_pack.append(
+            {
+                "property_id": item.property_id,
+                "title": item.title,
+                "description": item.description,
+                "scope_note": item.scope_note,
+            }
+        )
+    if property_pack != expected_pack:
+        raise ValueError("Property pack does not match installed assumptions")
+    invocations = ledger.get("invocations")
+    if not isinstance(invocations, list):
+        raise ValueError("Call ledger invocations must be an array")
+    phases = {"search": 0, "confirmation": 0, "minimization": 0}
+    for ordinal, invocation in enumerate(invocations, start=1):
+        if not isinstance(invocation, Mapping) or invocation.get("ordinal") != ordinal:
+            raise ValueError("Call ledger ordinals are not canonical")
+        phase = invocation.get("phase")
+        if phase not in phases:
+            raise ValueError("Call ledger phase is invalid")
+        phases[str(phase)] += 1
+    if ledger.get("target_calls_total") != len(invocations):
+        raise ValueError("Call ledger total is inconsistent")
+    if any(ledger.get(f"{phase}_calls") != count for phase, count in phases.items()):
+        raise ValueError("Call ledger phase totals are inconsistent")
+    if phases["search"] != 2 * metadata["candidate_budget"]:
+        raise ValueError("Run budget is inconsistent with charged search calls")
+    costs = [invocation.get("estimated_cost_usd") for invocation in invocations]
+    if not all(isinstance(cost, (int, float)) and not isinstance(cost, bool) for cost in costs):
+        raise ValueError("Call ledger costs are invalid")
+    if not math.isclose(float(ledger.get("estimated_cost_usd", -1)), sum(costs)):
+        raise ValueError("Call ledger cost total is inconsistent")
+    cost_available = bool(invocations) and all(
+        invocation.get("cost_estimate_available") is True for invocation in invocations
+    )
+    if ledger.get("cost_estimate_available") is not cost_available:
+        raise ValueError("Call ledger cost availability is inconsistent")
+    coverage = value.get("coverage")
+    if not isinstance(coverage, Mapping) or set(coverage) != {"estimand", "cells", "trajectory"}:
+        raise ValueError("Run coverage is invalid")
+    cells = coverage["cells"]
+    trajectory = coverage["trajectory"]
+    if coverage["estimand"] != _COVERAGE_ESTIMAND:
+        raise ValueError("Run coverage estimand is inconsistent")
+    if (
+        not isinstance(cells, list)
+        or cells != sorted(set(cells))
+        or not all(isinstance(cell, str) and len(cell) <= 300 for cell in cells)
+    ):
+        raise ValueError("Run coverage cells are invalid")
+    if not isinstance(trajectory, list) or len(trajectory) > int(ledger["target_calls_total"]):
+        raise ValueError("Run coverage trajectory is invalid")
+    previous_calls = 0
+    previous_cells = 0
+    for point in trajectory:
+        if not isinstance(point, Mapping) or set(point) != {
+            "charged_target_calls",
+            "observed_cells",
+        }:
+            raise ValueError("Run coverage point is invalid")
+        calls = point["charged_target_calls"]
+        observed = point["observed_cells"]
+        if (
+            not isinstance(calls, int)
+            or not isinstance(observed, int)
+            or calls < previous_calls
+            or observed < previous_cells
+            or observed > len(cells)
+        ):
+            raise ValueError("Run coverage trajectory is inconsistent")
+        previous_calls, previous_cells = calls, observed
+    if trajectory and (
+        previous_calls > int(ledger["target_calls_total"]) or previous_cells != len(cells)
+    ):
+        raise ValueError("Run coverage terminal point is inconsistent")
+    for item in certificates:
+        if not isinstance(item, Mapping):
+            raise ValueError("Certificate must be an object")
+        data = {
+            key: field_value
+            for key, field_value in item.items()
+            if key not in {"property", "output_distribution", "minimization_evidence"}
+        }
+        certificate = FailureCertificate.model_validate_json(canonical_json(data))
+        if recompute_certificate_id(certificate) != certificate.certificate_id:
+            raise ValueError("Certificate digest does not match its content")
+        if certificate.property_id not in property_ids:
+            raise ValueError("Certificate property is not in run property pack")
+        if (
+            certificate.seed != metadata["seed"]
+            or certificate.engine_config_hash != metadata["engine_config_hash"]
+        ):
+            raise ValueError("Certificate metadata is inconsistent with the run")
+        identity = {
+            "seed": metadata["seed"],
+            "candidate_budget": metadata["candidate_budget"],
+            "property_pack_digest": metadata["property_pack_digest"],
+            "model_id": certificate.model_id,
+            "model_config_hash": certificate.model_config_hash,
+            "engine_config_hash": metadata["engine_config_hash"],
+        }
+        if metadata["run_id"] != f"run-{_digest_json(identity)[:16]}":
+            raise ValueError("Run ID does not match certificate metadata")
+        if (
+            certificate.replay_command
+            != f"atlas replay certificates/{certificate.certificate_id}.json"
+        ):
+            raise ValueError("Certificate replay command is not canonical")
+        if item.get("property") != expected_pack[property_ids.index(certificate.property_id)]:
+            raise ValueError("Certificate property snapshot is inconsistent")
+        if item.get("output_distribution") != _distribution(certificate):
+            raise ValueError("Certificate output distribution is inconsistent")
+        evidence = item.get("minimization_evidence")
+        if (
+            not isinstance(evidence, Mapping)
+            or set(evidence)
+            != {
+                "label",
+                "accepted",
+                "attempts",
+                "terminal_audit_attempts",
+                "terminal_audit_complete",
+            }
+            or evidence.get("label") != certificate.reducer_label
+            or evidence.get("accepted") is not True
+            or evidence.get("terminal_audit_complete") is not certificate.terminal_audit_complete
+        ):
+            raise ValueError("Certificate minimization evidence is inconsistent")
+        for attempts_name in ("attempts", "terminal_audit_attempts"):
+            attempts = evidence[attempts_name]
+            if not isinstance(attempts, list) or len(attempts) > 128:
+                raise ValueError("Certificate minimization attempts are invalid")
+            for attempt in attempts:
+                if not isinstance(attempt, Mapping) or set(attempt) != {
+                    "operation",
+                    "accepted",
+                    "reason",
+                }:
+                    raise ValueError("Certificate minimization attempt is invalid")
+                if (
+                    not isinstance(attempt["operation"], str)
+                    or len(attempt["operation"]) > 200
+                    or not isinstance(attempt["accepted"], bool)
+                    or not isinstance(attempt["reason"], str)
+                    or len(attempt["reason"]) > 500
+                ):
+                    raise ValueError("Certificate minimization attempt fields are invalid")
+    return value
 
 
 def trace_events(run: RunResult) -> list[dict[str, object]]:

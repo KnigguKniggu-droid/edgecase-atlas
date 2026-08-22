@@ -29,19 +29,55 @@ REQUIRED_IGNORED_PATHS: Final = (
 )
 
 _EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
-_LOCAL_PATH = re.compile(
-    r"(?i)(?:\b[A-Z]:[\\/]+Users[\\/]+[^\s\"']+|/(?:Users|home)/[^\s\"']+)"
+_WINDOWS_PATH = re.compile(
+    r"(?i)(?<![A-Z0-9_])(?:[A-Z]:[\\/][^\s\"'<>|]*|"
+    r"\\\\[A-Z0-9._$-]+\\[^\s\"'<>|]+)"
+)
+_UNIX_PATH = re.compile(
+    r"(?<![:/A-Za-z0-9._-])/(?:Users|home|root|tmp|var|etc|opt)/"
+    r"(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
 )
 _MODEL_WEIGHT = re.compile(r"(?i)\b[\w.-]+\.(?:gguf|safetensors|pt|pth|ckpt)\b")
 _SECRET = re.compile(
-    r"(?i)(?:\bsk-(?:proj-|test-)?[A-Z0-9_-]{20,}\b|"
+    r"(?im)(?:\bsk-(?:proj-|test-)?[A-Z0-9_-]{20,}\b|"
     r"\bgh[pousr]_[A-Z0-9_]{20,}\b|"
     r"\bAKIA[A-Z0-9]{16}\b|"
+    r"\bAIza[A-Z0-9_-]{35}\b|"
+    r"\b(?:sk|rk|pk)_(?:live|test)_[A-Z0-9]{16,}\b|"
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
-    r"(?:api[_-]?key|access[_-]?token|secret|password)\s*[:=]\s*[\"']"
-    r"[A-Z0-9+/=_-]{20,}[\"'])"
+    r"(?:api[_-]?key|access[_-]?token|auth[_-]?token|secret|password)[ \t]*[:=][ \t]*"
+    r"(?![ \t]*(?:$|[\"']?\$|[\"']?[<{]|TBD\b|REDACTED\b))"
+    r"[\"']?[A-Z0-9+/=_-]{20,}[\"']?)"
 )
 _NOREPLY = re.compile(r"(?i)^[A-Z0-9._%+-]+@users\.noreply\.github\.com$")
+_TAGGER = re.compile(r"(?m)^tagger (.*) <([^>]*)> \d+ [+-]\d+$")
+_PATH_ALLOWLIST: Final = {
+    "scripts/identity_scan.py": (
+        r"C:\private\sample",
+        r"C:\private\fixture-secret",
+        r"D:\private\project",
+        r"C:\\private\\sample",
+        r"\\server\\share\\project",
+        "/opt/private/project",
+    ),
+    "tests/test_streamlit_app.py": (
+        r"C:\private\sample",
+        r"C:\\private\\sample",
+        r"C:\private\fixture-secret",
+    ),
+    "tests/test_release_hardening.py": (
+        r"D:\private\project",
+        r"\\server\\share\\project",
+        "/opt/private/project",
+    ),
+}
+_MODEL_ALLOWLIST: Final = {
+    "scripts/identity_scan.py": (
+        "weights" + ".gguf",
+        "weights" + ".bin",
+        "weights" + ".safetensors",
+    )
+}
 
 
 @dataclass(frozen=True, order=True)
@@ -55,20 +91,29 @@ class Finding:
         return f"{self.path.as_posix()}: {self.kind}"
 
 
-def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    root: Path,
+    arguments: list[str],
+    *,
+    input_bytes: bytes | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(  # noqa: S603
         ["git", *arguments],  # noqa: S607
         cwd=root,
-        check=True,
+        input=input_bytes,
+        check=check,
         capture_output=True,
-        text=True,
-        encoding="utf-8",
     )
+
+
+def _git(root: Path, *arguments: str) -> str:
+    return _run(root, list(arguments)).stdout.decode("utf-8", errors="replace")
 
 
 def _public_files(root: Path) -> tuple[Path, ...]:
     result = _git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-    paths = {root / item for item in result.stdout.split("\0") if item}
+    paths = {root / item for item in result.split("\0") if item}
     for directory_name in GENERATED_DIRECTORIES:
         directory = root / directory_name
         if directory.is_dir():
@@ -110,6 +155,14 @@ def scan_filename(path: Path) -> list[Finding]:
     return sorted(findings)
 
 
+def _has_unallowed_match(
+    pattern: re.Pattern[str],
+    text: str,
+    allowed: tuple[str, ...],
+) -> bool:
+    return any(match.group() not in allowed for match in pattern.finditer(text))
+
+
 def scan_text(
     path: Path,
     text: str,
@@ -118,11 +171,16 @@ def scan_text(
 ) -> list[Finding]:
     """Scan text while returning rule names, never matched sensitive values."""
     findings: set[Finding] = set()
-    if _LOCAL_PATH.search(text):
+    path_key = path.as_posix()
+    allowed_paths = _PATH_ALLOWLIST.get(path_key, ())
+    if _has_unallowed_match(_WINDOWS_PATH, text, allowed_paths) or _has_unallowed_match(
+        _UNIX_PATH, text, allowed_paths
+    ):
         findings.add(Finding(path, "local_path"))
     if _SECRET.search(text):
         findings.add(Finding(path, "secret"))
-    if path.name != ".gitignore" and _MODEL_WEIGHT.search(text):
+    allowed_models = _MODEL_ALLOWLIST.get(path_key, ())
+    if path.name != ".gitignore" and _has_unallowed_match(_MODEL_WEIGHT, text, allowed_models):
         findings.add(Finding(path, "model_weight"))
     if any(not _email_is_public_fixture(match.group()) for match in _EMAIL.finditer(text)):
         findings.add(Finding(path, "personal_email"))
@@ -131,48 +189,146 @@ def scan_text(
     return sorted(findings)
 
 
+def scan_bytes(
+    path: Path,
+    data: bytes,
+    *,
+    private_values: tuple[str, ...] = (),
+) -> list[Finding]:
+    """Fail closed on opaque binary content in publishable artifacts."""
+    if b"\0" in data:
+        return [Finding(path, "opaque_binary")]
+    return scan_text(path, data.decode("utf-8", errors="replace"), private_values=private_values)
+
+
 def validate_ignored_paths(root: Path) -> list[Finding]:
     """Require every sensitive or generated path class to remain ignored."""
     findings: list[Finding] = []
     for value in REQUIRED_IGNORED_PATHS:
-        result = subprocess.run(  # noqa: S603
-            ["git", "check-ignore", "--no-index", "--quiet", "--", value],  # noqa: S607
-            cwd=root,
+        result = _run(
+            root,
+            ["check-ignore", "--no-index", "--quiet", "--", value],
             check=False,
-            capture_output=True,
         )
         if result.returncode != 0:
             findings.append(Finding(Path(value), "not_ignored"))
     return findings
 
 
-def _git_identity_findings(root: Path) -> set[Finding]:
+def _redact(findings: list[Finding], label: str) -> set[Finding]:
+    return {Finding(Path(label), finding.kind) for finding in findings}
+
+
+def _commit_findings(root: Path, private_values: tuple[str, ...]) -> set[Finding]:
     findings: set[Finding] = set()
-    history = _git(root, "log", "--format=%an%x09%ae", "--all").stdout.splitlines()
-    for index, line in enumerate(history, 1):
-        name, separator, email = line.partition("\t")
-        if separator != "\t" or not git_identity_is_anonymous(name, email):
-            findings.add(Finding(Path(f"<git-author-{index}>"), "git_identity"))
+    for index, commit in enumerate(_git(root, "rev-list", "--all").splitlines(), 1):
+        metadata = _git(
+            root,
+            "show",
+            "-s",
+            "--format=%an%x00%ae%x00%cn%x00%ce%x00%B",
+            commit,
+        ).split("\0", 4)
+        if len(metadata) != 5:
+            findings.add(Finding(Path(f"<git-commit-{index}>"), "git_metadata"))
+            continue
+        author_name, author_email, committer_name, committer_email, message = metadata
+        if not git_identity_is_anonymous(
+            author_name, author_email
+        ) or not git_identity_is_anonymous(committer_name, committer_email):
+            findings.add(Finding(Path(f"<git-commit-{index}>"), "git_identity"))
+        findings.update(
+            _redact(
+                scan_text(Path("commit-message.txt"), message, private_values=private_values),
+                f"<git-commit-{index}>",
+            )
+        )
+    return findings
+
+
+def _tag_findings(root: Path, private_values: tuple[str, ...]) -> set[Finding]:
+    findings: set[Finding] = set()
+    tags = _git(root, "for-each-ref", "--format=%(refname:short)", "refs/tags").splitlines()
+    for index, tag in enumerate(tags, 1):
+        label = f"<git-tag-{index}>"
+        findings.update(_redact(scan_filename(Path(tag)), label))
+        findings.update(_redact(scan_text(Path("tag-name.txt"), tag), label))
+        if _git(root, "cat-file", "-t", f"refs/tags/{tag}").strip() != "tag":
+            continue
+        body = _git(root, "cat-file", "tag", f"refs/tags/{tag}")
+        header, _, message = body.partition("\n\n")
+        tagger = _TAGGER.search(header)
+        if tagger is None or not git_identity_is_anonymous(tagger.group(1), tagger.group(2)):
+            findings.add(Finding(Path(label), "git_identity"))
+        findings.update(
+            _redact(
+                scan_text(Path("tag-message.txt"), message, private_values=private_values),
+                label,
+            )
+        )
+    return findings
+
+
+def _blob_payloads(root: Path, object_ids: list[str]) -> list[bytes]:
+    if not object_ids:
+        return []
+    result = _run(
+        root, ["cat-file", "--batch"], input_bytes=("\n".join(object_ids) + "\n").encode()
+    )
+    payloads: list[bytes] = []
+    position = 0
+    for _ in object_ids:
+        header_end = result.stdout.index(b"\n", position)
+        size = int(result.stdout[position:header_end].rsplit(b" ", 1)[1])
+        start = header_end + 1
+        payloads.append(result.stdout[start : start + size])
+        position = start + size + 1
+    return payloads
+
+
+def _history_blob_findings(root: Path, private_values: tuple[str, ...]) -> set[Finding]:
+    findings: set[Finding] = set()
+    objects = [
+        line.partition(" ") for line in _git(root, "rev-list", "--objects", "--all").splitlines()
+    ]
+    with_paths = [(object_id, path) for object_id, separator, path in objects if separator and path]
+    if not with_paths:
+        return findings
+    check = (
+        _run(
+            root,
+            ["cat-file", "--batch-check=%(objectname) %(objecttype)"],
+            input_bytes=("\n".join(object_id for object_id, _ in with_paths) + "\n").encode(),
+        )
+        .stdout.decode("ascii", errors="replace")
+        .splitlines()
+    )
+    blobs = [item for item, line in zip(with_paths, check, strict=True) if line.endswith(" blob")]
+    for index, ((_, raw_path), payload) in enumerate(
+        zip(blobs, _blob_payloads(root, [object_id for object_id, _ in blobs]), strict=True),
+        1,
+    ):
+        path = Path(raw_path)
+        label = f"<git-blob-{index}>"
+        findings.update(_redact(scan_filename(path), label))
+        findings.update(_redact(scan_text(Path("history-name.txt"), raw_path), label))
+        findings.update(_redact(scan_bytes(path, payload, private_values=private_values), label))
     return findings
 
 
 def scan_repository(root: Path) -> list[Finding]:
-    """Scan publishable content, generated output, ignore rules, and Git authors."""
+    """Scan publishable files, reachable history, refs, ignore rules, and identities."""
     root = root.resolve()
-    findings = set(validate_ignored_paths(root)) | _git_identity_findings(root)
     private_values = _private_values(root)
+    findings = set(validate_ignored_paths(root))
+    findings.update(_commit_findings(root, private_values))
+    findings.update(_tag_findings(root, private_values))
+    findings.update(_history_blob_findings(root, private_values))
     for path in _public_files(root):
         relative_path = path.relative_to(root)
         findings.update(scan_filename(relative_path))
         data = path.read_bytes()
-        if b"\0" not in data:
-            findings.update(
-                scan_text(
-                    relative_path,
-                    data.decode("utf-8", errors="replace"),
-                    private_values=private_values,
-                )
-            )
+        findings.update(scan_bytes(relative_path, data, private_values=private_values))
     return sorted(findings)
 
 
@@ -182,7 +338,7 @@ def main(arguments: list[str] | None = None) -> int:
     options = parser.parse_args(arguments)
     try:
         findings = scan_repository(options.root)
-    except (OSError, subprocess.CalledProcessError, UnicodeError):
+    except (OSError, subprocess.CalledProcessError, UnicodeError, ValueError):
         print("Identity scan could not complete.")
         return 2
     if findings:

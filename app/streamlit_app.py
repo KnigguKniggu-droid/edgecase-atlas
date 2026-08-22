@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Mapping, Sequence
 from typing import cast
 
@@ -13,9 +14,11 @@ from app.ui import (
     PUBLIC_BUDGET_MIN,
     PUBLIC_SEED_MAX,
     PUBLIC_TEXT_MAX_CHARS,
+    PUBLIC_TIMEOUT_SECONDS,
     DemoArtifacts,
     RunStatus,
     build_demo_artifacts,
+    claim_public_run,
     status_copy,
     validate_public_request,
 )
@@ -24,6 +27,8 @@ from edgecase_atlas import __version__
 from edgecase_atlas.fixtures import known_violation_cases
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK
 from edgecase_atlas.serialization import canonical_json
+
+_PUBLIC_RUN_SLOTS = threading.BoundedSemaphore(2)
 
 st.set_page_config(
     page_title="EdgeCase Atlas",
@@ -291,7 +296,7 @@ with st.form("atlas_demo_form", border=True):
             value=1,
             step=1,
             key="atlas_budget_input",
-            help="Public runs are capped at 25 generated candidates.",
+            help="Public runs are capped at 5 generated candidates.",
         )
     custom_text = st.text_area(
         "Optional synthetic scenario context",
@@ -347,7 +352,16 @@ if submitted:
                 state="running",
             ) as run_status:
                 st.write(running_detail)
-                artifacts = asyncio.run(build_demo_artifacts(request))
+                if not claim_public_run():
+                    raise RuntimeError("Public demonstration rate limit reached")
+                if not _PUBLIC_RUN_SLOTS.acquire(blocking=False):
+                    raise RuntimeError("Public demonstration is busy")
+                try:
+                    artifacts = asyncio.run(
+                        asyncio.wait_for(build_demo_artifacts(request), PUBLIC_TIMEOUT_SECONDS)
+                    )
+                finally:
+                    _PUBLIC_RUN_SLOTS.release()
                 run_status.update(label="Demonstration complete", state="complete", expanded=False)
             st.session_state["atlas_run_artifacts"] = artifacts
             st.session_state["atlas_run_status"] = (

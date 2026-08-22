@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Lock
+from time import monotonic
 from typing import Literal, NamedTuple
 
 from edgecase_atlas.engine import AtlasEngine, RunResult
@@ -15,9 +18,14 @@ from edgecase_atlas.serialization import canonical_json, run_document, trace_eve
 
 PUBLIC_ADAPTER_ID = "faulty_fixture"
 PUBLIC_BUDGET_MIN = 1
-PUBLIC_BUDGET_MAX = 25
+PUBLIC_BUDGET_MAX = 5
 PUBLIC_TEXT_MAX_CHARS = 1_000
 PUBLIC_SEED_MAX = 2**31 - 1
+PUBLIC_TIMEOUT_SECONDS = 30
+PUBLIC_ARTIFACT_MAX_BYTES = 2_000_000
+PUBLIC_RUNS_PER_MINUTE = 10
+_PUBLIC_RUN_TIMES: deque[float] = deque()
+_PUBLIC_RUN_LOCK = Lock()
 
 RunStatus = Literal["empty", "running", "success", "no_failure", "input_error", "adapter_error"]
 
@@ -81,6 +89,18 @@ def validate_public_request(
     )
 
 
+def claim_public_run(now: float | None = None) -> bool:
+    """Enforce one process-wide rolling limit for hosted work."""
+    current = monotonic() if now is None else now
+    with _PUBLIC_RUN_LOCK:
+        while _PUBLIC_RUN_TIMES and current - _PUBLIC_RUN_TIMES[0] >= 60:
+            _PUBLIC_RUN_TIMES.popleft()
+        if len(_PUBLIC_RUN_TIMES) >= PUBLIC_RUNS_PER_MINUTE:
+            return False
+        _PUBLIC_RUN_TIMES.append(current)
+        return True
+
+
 def public_adapter(adapter_id: str) -> FaultyDemonstrationAgent:
     """Return the only adapter allowed in the hosted no-key demonstration."""
     if adapter_id != PUBLIC_ADAPTER_ID:
@@ -114,6 +134,8 @@ async def build_demo_artifacts(request: DemoRequest) -> DemoArtifacts:
         output_path = Path(temporary_directory) / "report.html"
         render_html_report(document, output_path)
         html_bytes = output_path.read_bytes()
+    if max(map(len, (json_bytes, jsonl_bytes, html_bytes))) > PUBLIC_ARTIFACT_MAX_BYTES:
+        raise ValueError("Public artifact exceeds the hosted size limit")
     return DemoArtifacts(run, document, json_bytes, jsonl_bytes, html_bytes)
 
 

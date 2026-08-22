@@ -65,7 +65,6 @@ def release_commands(python: Path, wheel_directory: Path) -> tuple[tuple[str, ..
             "wheel",
             ".",
             "--no-deps",
-            "--no-build-isolation",
             "--no-cache-dir",
             "--wheel-dir",
             str(wheel_directory),

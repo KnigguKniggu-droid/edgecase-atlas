@@ -38,7 +38,7 @@ def clean_install_commands(
     )
     return (
         (str(python), "-m", "venv", "--system-site-packages", str(environment)),
-        (str(clean_python), "-m", "pip", "install", str(wheel)),
+        (str(clean_python), "-m", "pip", "install", "--force-reinstall", str(wheel)),
         (str(clean_python), "-c", "import sys; " + import_check),
         (
             str(clean_python),

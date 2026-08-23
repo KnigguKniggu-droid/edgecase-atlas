@@ -8,7 +8,12 @@ from collections.abc import Mapping, Sequence
 from typing import cast
 
 import streamlit as st
-from app.ui import (
+
+from edgecase_atlas import __version__
+from edgecase_atlas.fixtures import known_violation_cases
+from edgecase_atlas.properties import STARTER_PROPERTY_PACK
+from edgecase_atlas.serialization import canonical_json
+from ui import (
     PUBLIC_ADAPTER_ID,
     PUBLIC_BUDGET_MAX,
     PUBLIC_BUDGET_MIN,
@@ -22,11 +27,6 @@ from app.ui import (
     status_copy,
     validate_public_request,
 )
-
-from edgecase_atlas import __version__
-from edgecase_atlas.fixtures import known_violation_cases
-from edgecase_atlas.properties import STARTER_PROPERTY_PACK
-from edgecase_atlas.serialization import canonical_json
 
 _PUBLIC_RUN_SLOTS = threading.BoundedSemaphore(2)
 

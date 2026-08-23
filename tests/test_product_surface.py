@@ -173,3 +173,15 @@ def test_a_page_test_passes_on_its_own_without_a_prior_entrypoint_load() -> None
         check=False,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_research_page_gate_copy_matches_the_published_constants() -> None:
+    """The Research page spells the gate out, so hold that copy to the real constants.
+
+    Home already has this guard. Without the same one here, changing the gate would leave the
+    most research-facing page stating a number the engine no longer uses, with every test green.
+    """
+    source = PAGES["research"].read_text(encoding="utf-8")
+    expected = f"{REQUIRED_REPRODUCTIONS}-of-{CONFIRMATION_TRIALS}"
+    assert f'GATE_SUMMARY = "{expected}"' in source
+    assert "4-of-5" not in source.replace(f'GATE_SUMMARY = "{expected}"', "")

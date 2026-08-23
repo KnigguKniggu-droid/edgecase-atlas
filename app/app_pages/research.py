@@ -10,6 +10,12 @@ from edgecase_atlas.properties import STARTER_PROPERTY_PACK
 from product_ui import render_benchmark_result, render_page_intro, render_privacy_footer
 from showcase import PublicBenchmark, generate_public_benchmark
 
+# Spelled out rather than imported, because app files deploy straight from the
+# repository while the hosted environment resolves the installed package separately.
+# tests/test_product_surface.py holds this to REQUIRED_REPRODUCTIONS and
+# CONFIRMATION_TRIALS so it cannot drift.
+GATE_SUMMARY = "4-of-5"
+
 
 @st.cache_data(show_spinner=False)  # type: ignore[untyped-decorator]
 def _benchmark() -> PublicBenchmark:
@@ -49,7 +55,7 @@ if st.button(
 ):
     with st.status("Running five controlled candidates", expanded=True) as status:
         st.write("Use seed 42 and one candidate per property")
-        st.write("Apply the 4-of-5 repeatability gate")
+        st.write(f"Apply the {GATE_SUMMARY} repeatability gate")
         st.write("Measure calls, certificates, and observed coverage")
         st.session_state["atlas_benchmark"] = _benchmark()
         status.update(label="Synthetic calibration complete", state="complete", expanded=False)
@@ -134,7 +140,7 @@ with st.container(key="atlas_research_ledger"):
         },
     ]
 
-    st.dataframe(ledger_rows, hide_index=True, use_container_width=True)
+    st.dataframe(ledger_rows, hide_index=True, width="stretch")
 
 with st.container(key="atlas_research_next"):
     st.subheader("The defensible research step")

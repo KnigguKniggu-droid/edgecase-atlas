@@ -12,6 +12,7 @@ from edgecase_atlas.properties import STARTER_PROPERTY_PACK
 from edgecase_atlas.serialization import canonical_json
 from product_ui import (
     DownloadArtifact,
+    render_counterfactual_faultline,
     render_download_controls,
     render_evidence_pipeline,
     render_failure_certificate,
@@ -65,6 +66,23 @@ if property_id:
             f"{rate['reproductions']}/{rate['trials']}",
             border=True,
         )
+
+        source_scenario = cast(Mapping[str, object], certificate["source"])
+        follow_up_scenario = cast(
+            Mapping[str, object],
+            certificate.get("minimized_follow_up") or certificate.get("follow_up") or {},
+        )
+        changed_fields = cast(
+            Sequence[Mapping[str, object]],
+            certificate.get("changed_fields") or (),
+        )
+        render_counterfactual_faultline(
+            source_scenario,
+            changed_fields,
+            follow_up_scenario,
+            key="atlas_gallery_faultline",
+        )
+
         render_evidence_pipeline(certificate, key="atlas_gallery_pipeline")
         render_failure_certificate(
             certificate,

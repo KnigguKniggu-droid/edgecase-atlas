@@ -222,3 +222,26 @@ def test_ci_detection_only_accepts_explicit_truthy_values(
     for value in ("", "false", "0", "no"):
         monkeypatch.setenv("CI", value)
         assert not running_in_ci()
+
+
+def test_requirements_match_the_project_dependencies() -> None:
+    """The hosted deploy installs from requirements.txt, so it must mirror pyproject exactly.
+
+    It also ends with ``.`` so the project itself is reinstalled on every deploy. Without that,
+    the hosted environment keeps an older build of ``edgecase_atlas`` while files under ``app``
+    deploy live from the repository, and any app module importing a newly added package symbol
+    raises ImportError in production while every local gate still passes.
+    """
+    import tomllib
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = list(project["project"]["dependencies"])
+
+    lines = [
+        line.strip()
+        for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+    assert lines[-1] == ".", "requirements.txt must install this project on every deploy"
+    assert lines[:-1] == declared, "requirements.txt drifted from pyproject dependencies"

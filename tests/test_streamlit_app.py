@@ -410,3 +410,17 @@ def test_test_lab_post_run_promotes_local_agent_bridge_as_step_two() -> None:
     )
     assert any(b.key == "atlas_lab_download_starter_yaml" for b in app.download_button)
     assert any("atlas test --config atlas.yaml" in item.value for item in app.code)
+
+
+
+
+def test_certificates_page_renders_complete_faultline_evidence() -> None:
+    """The Certificates page must render the source, mutation, and counterfactual cards."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/certificates.py").run(timeout=30)
+
+    assert not app.exception
+    assert any(item.value == "The decision fault line" for item in app.subheader)
+    assert any("Certificate JSON" in item.label for item in app.download_button)
+    assert any("Complete run JSON" in item.label for item in app.download_button)
+

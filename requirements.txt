@@ -1,0 +1,17 @@
+# Generated from pyproject.toml [project.dependencies]. Kept in sync by
+# tests/test_release_hardening.py::test_requirements_match_the_project_dependencies.
+#
+# The trailing '.' installs this project from the repository on every deploy. Without it the
+# hosted environment keeps an older build of edgecase_atlas while app/ files deploy live, so
+# any app module importing a newly added package symbol raises ImportError in production.
+httpx>=0.28,<1
+hypothesis>=6.156,<7
+jinja2>=3.1,<4
+plotly>=6.0,<7
+pydantic>=2.12,<3
+pyyaml>=6.0,<7
+rich>=14.3,<15
+streamlit==1.61.1
+typer>=0.23,<1
+z3-solver>=4.15,<5
+.

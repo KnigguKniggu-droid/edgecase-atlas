@@ -10,7 +10,15 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from scripts.identity_scan import scan_repository, scan_text
+from scripts.identity_scan import (
+    PRIVATE_PATTERNS_FILE,
+    running_in_ci,
+    scan_repository,
+    scan_text,
+)
+from scripts.identity_scan import (
+    main as identity_scan_main,
+)
 from scripts.smoke_test import scan_artifacts, without_credentials
 from scripts.verify_release import clean_install_commands
 
@@ -182,3 +190,35 @@ def test_curated_sample_certificate_and_report_match_manifest() -> None:
     assert "<!doctype html>" in report.casefold()
     assert certificate.certificate_id in report
     assert scan_artifacts((certificate_path, report_path)) is None
+
+
+def test_identity_scan_never_claims_a_pass_it_did_not_perform(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A missing private-term list must stop the local gate instead of printing a clean pass.
+
+    The list is gitignored and local-only, so its absence outside CI means the private-term
+    check ran against nothing. Reporting success there would make the privacy gate decorative.
+    """
+    monkeypatch.delenv("CI", raising=False)
+    assert not (tmp_path / PRIVATE_PATTERNS_FILE).exists()
+
+    assert identity_scan_main([str(tmp_path)]) == 2
+    output = capsys.readouterr().out
+    assert "Identity scan incomplete" in output
+    assert "Identity scan passed" not in output
+
+
+def test_ci_detection_only_accepts_explicit_truthy_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    assert not running_in_ci()
+    for value in ("true", "TRUE", " 1 ", "yes", "on"):
+        monkeypatch.setenv("CI", value)
+        assert running_in_ci()
+    for value in ("", "false", "0", "no"):
+        monkeypatch.setenv("CI", value)
+        assert not running_in_ci()

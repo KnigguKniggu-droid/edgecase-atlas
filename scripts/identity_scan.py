@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -140,6 +141,15 @@ def _public_files(root: Path) -> tuple[Path, ...]:
         if directory.is_dir():
             paths.update(path for path in directory.rglob("*") if path.is_file())
     return tuple(sorted(path for path in paths if path.is_file()))
+
+
+def running_in_ci() -> bool:
+    """Report whether this is a hosted CI run.
+
+    The private-term list is deliberately local-only and gitignored, so it can never exist on a
+    CI runner. Everywhere else its absence means the private-term check silently did nothing.
+    """
+    return os.environ.get("CI", "").strip().casefold() in {"1", "true", "yes", "on"}
 
 
 def _private_values(root: Path) -> tuple[str, ...]:
@@ -362,6 +372,13 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", nargs="?", type=Path, default=Path.cwd())
     options = parser.parse_args(arguments)
+    patterns_available = (options.root / PRIVATE_PATTERNS_FILE).is_file()
+    if not patterns_available and not running_in_ci():
+        print(
+            f"Identity scan incomplete: {PRIVATE_PATTERNS_FILE} is missing, so no private term "
+            "was checked. Create it locally with one term per line; it stays gitignored."
+        )
+        return 2
     try:
         findings = scan_repository(options.root)
     except (OSError, subprocess.CalledProcessError, UnicodeError, ValueError):
@@ -372,7 +389,10 @@ def main(arguments: list[str] | None = None) -> int:
             print(finding.safe_message())
         print(f"Identity scan failed with {len(findings)} finding(s).")
         return 1
-    print("Identity scan passed.")
+    if patterns_available:
+        print("Identity scan passed.")
+    else:
+        print("Identity scan passed without private-term coverage (CI has no local term list).")
     return 0
 
 

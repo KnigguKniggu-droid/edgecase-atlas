@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Annotated, Literal
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from edgecase_atlas.adapters import validate_openai_base_url

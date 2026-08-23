@@ -29,25 +29,30 @@ for key, default in {
 }.items():
     st.session_state.setdefault(key, default)
 
-pages = [
-    st.Page("app_pages/home.py", title="Home", icon=":material/home:", default=True),
-    st.Page("app_pages/test_lab.py", title="Test Lab", icon=":material/radar:"),
-    st.Page(
-        "app_pages/compare_runs.py",
-        title="Compare Runs",
-        icon=":material/difference:",
-    ),
-    st.Page(
-        "app_pages/certificates.py",
-        title="Certificates",
-        icon=":material/verified:",
-    ),
-    st.Page("app_pages/research.py", title="Research", icon=":material/biotech:"),
-]
+# Single source of truth for the public workflow surface. st.navigation registers the routes
+# and the visible bar renders from the same tuple, so a page cannot exist in one and not the other.
+PAGE_SPECS = (
+    ("app_pages/home.py", "Home", ":material/home:"),
+    ("app_pages/test_lab.py", "Test Lab", ":material/radar:"),
+    ("app_pages/compare_runs.py", "Compare Runs", ":material/difference:"),
+    ("app_pages/certificates.py", "Certificates", ":material/verified:"),
+    ("app_pages/research.py", "Research", ":material/biotech:"),
+)
+
+navigation = st.navigation(
+    [
+        st.Page(path, title=title, icon=icon, default=position == 0)
+        for position, (path, title, icon) in enumerate(PAGE_SPECS)
+    ],
+    position="hidden",
+)
 
 with st.container(horizontal=True, horizontal_alignment="distribute", key="atlas_shell_brand"):
     st.markdown("**EDGECASE ATLAS**")
     st.caption(f"ALPHA {__version__}  /  SYNTHETIC RESEARCH MODE")
 
-navigation = st.navigation(pages, position="top")
+with st.container(horizontal=True, key="atlas_shell_nav"):
+    for path, title, icon in PAGE_SPECS:
+        st.page_link(path, label=title, icon=icon)
+
 navigation.run()

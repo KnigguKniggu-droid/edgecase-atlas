@@ -9,6 +9,7 @@ import streamlit as st
 
 from edgecase_atlas.fixtures import known_violation_cases
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK
+from edgecase_atlas.starter_config import LocalAdapterKind, get_starter_definition
 from product_ui import (
     DownloadArtifact,
     render_counterfactual_faultline,
@@ -27,6 +28,68 @@ from ui import (
     DemoArtifacts,
     validate_public_request,
 )
+
+
+def _render_local_agent_onboarding(*, is_post_run: bool) -> None:
+    """Render a dedicated, prominent bridge connecting the demo to local agent testing."""
+    with st.container(key="atlas_lab_onboarding_section"):
+        st.divider()
+        if is_post_run:
+            st.subheader("Step 2: Test your own agent against this failure mode", anchor=False)
+            st.markdown(
+                "Now that you have observed the synthetic counterfactual break, connect your "
+                "own driving agent locally to discover if it shares the same blind spot. "
+                "**Runs on your machine, never in this hosted app.**"
+            )
+        else:
+            st.subheader("Connect your own agent locally (CLI & SDK)", anchor=False)
+            st.markdown(
+                "**Runs on your machine, never in this hosted app.** "
+                "Atlas connects to your driving agent locally via Python functions, "
+                "JSONL subprocesses, or OpenAI-compatible endpoints."
+            )
+
+        adapter_choice = st.pills(
+            "Integration mode",
+            options=cast(tuple[LocalAdapterKind, ...], ("python", "subprocess", "openai")),
+            default="python",
+            selection_mode="single",
+            format_func=lambda k: {
+                "python": "Python Function",
+                "subprocess": "JSONL Subprocess",
+                "openai": "OpenAI-Compatible",
+            }[k],
+            key="atlas_lab_adapter_choice",
+        )
+        starter = get_starter_definition(adapter_choice or "python")
+
+        st.markdown(f"**{starter.title}**")
+        st.caption(starter.summary)
+
+        col_proto, col_yaml = st.columns(2)
+        with col_proto:
+            st.markdown("**Adapter Protocol Contract**")
+            st.code(starter.protocol_snippet, language="python")
+        with col_yaml:
+            st.markdown("**Validated `atlas.yaml` Starter**")
+            st.code(starter.config_yaml, language="yaml")
+            st.download_button(
+                label="Download atlas.yaml",
+                data=starter.config_yaml.encode("utf-8"),
+                file_name="atlas.yaml",
+                mime="application/x-yaml",
+                icon=":material/download:",
+                key="atlas_lab_download_starter_yaml",
+            )
+
+        st.markdown("**Run locally with the Atlas CLI:**")
+        st.code(
+            "atlas validate atlas.yaml\n"
+            "atlas test --config atlas.yaml --budget 100 --seed 42\n"
+            "atlas report runs/RUN.json --format html",
+            language="powershell",
+        )
+
 
 render_page_intro(
     eyebrow="TEST LAB / CONTROLLED MUTATIONS",
@@ -119,12 +182,15 @@ if submitted:
         st.session_state["atlas_lab_artifacts"] = artifacts
 
 stored = st.session_state.get("atlas_lab_artifacts")
+has_completed_run = False
+
 if isinstance(stored, DemoArtifacts):
     document = stored.document
     certificates = cast(Sequence[Mapping[str, object]], document["certificates"])
     if not certificates:
         st.warning("No repeatable failure was found. This is not evidence that the agent is safe.")
     else:
+        has_completed_run = True
         titles = [
             str(cast(Mapping[str, object], certificate["property"])["title"])
             for certificate in certificates
@@ -172,5 +238,7 @@ if isinstance(stored, DemoArtifacts):
             ),
             key="atlas_lab_downloads",
         )
+
+_render_local_agent_onboarding(is_post_run=has_completed_run)
 
 render_privacy_footer(key="atlas_lab_footer")

@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import importlib.util
 import re
+import sys
 from collections.abc import Mapping
 from pathlib import Path
+from types import ModuleType
 from typing import Annotated, NoReturn, cast
 
 import typer
-import yaml  # type: ignore[import-untyped]
+import yaml
 from jinja2 import TemplateError
 from pydantic import ValidationError
 
@@ -124,6 +127,11 @@ def test_command(
     typer.echo(f"Trace: {paths['trace']}")
     typer.echo(f"Report: {paths['report']}")
     typer.echo(f"Certificates: {paths['certificate_count']}")
+    if paths["certificate_count"] == 0:
+        typer.echo(
+            "No repeatable failure was found under this budget, seed, and property selection. "
+            "That is not evidence that the agent is safe."
+        )
 
 
 @app.command("gate")
@@ -329,12 +337,43 @@ async def _replay(config: AtlasConfig, certificate: FailureCertificate) -> Repro
         await _close_adapter(adapter)
 
 
+def _import_agent_module(name: str) -> ModuleType:
+    """Import a configured agent module, preferring an installed one over a local file.
+
+    The installed ``atlas`` console script does not place the working directory on
+    ``sys.path``, so a plain import cannot see the ``agent.py`` that sits beside the user's
+    ``atlas.yaml``. Every other CLI path already resolves against the working directory, so
+    the local file is looked up there too. An installed module still wins, which keeps a
+    packaged agent working unchanged.
+
+    Only a miss on this exact module falls through; a ``ModuleNotFoundError`` raised by the
+    user's own imports propagates so a missing dependency is never reported as a missing agent.
+    Local resolution executes the named file, which is the documented purpose of the Python
+    adapter. It is a local CLI capability only and is never reachable from the hosted app.
+    """
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError as error:
+        if error.name != name:
+            raise
+    candidate = Path.cwd().joinpath(*name.split(".")).with_suffix(".py")
+    if not candidate.is_file():
+        raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+    specification = importlib.util.spec_from_file_location(name, candidate)
+    if specification is None or specification.loader is None:
+        raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+    module = importlib.util.module_from_spec(specification)
+    sys.modules[name] = module
+    specification.loader.exec_module(module)
+    return module
+
+
 def _build_adapter(config: AtlasConfig) -> AgentAdapter:
     adapter_config = config.adapter
     if adapter_config.kind == "faulty":
         return FaultyDemonstrationAgent()
     if isinstance(adapter_config, PythonAdapterConfig):
-        target = getattr(importlib.import_module(adapter_config.module), adapter_config.callable)
+        target = getattr(_import_agent_module(adapter_config.module), adapter_config.callable)
         if not callable(target):
             raise TypeError("Configured Python target is not callable")
         return FunctionAdapter(

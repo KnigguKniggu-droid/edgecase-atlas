@@ -110,7 +110,10 @@ def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None
     theme_source = THEME_PATH.read_text(encoding="utf-8").lower()
     assert 'page_icon=":material/' not in app_source
     assert app_source.count("st.html(APP_CSS)") == 1
-    assert 'position="top"' in app_source
+    assert app_source.count("st.navigation(") == 1
+    assert 'position="hidden"' in app_source
+    assert app_source.count("st.Page(") == 1
+    assert app_source.count("st.page_link(") == 1
     assert "<script" not in theme_source
     assert "javascript:" not in theme_source
     assert "fonts.googleapis.com" not in theme_source
@@ -355,3 +358,55 @@ def test_curated_sample_selection_changes_the_executed_property() -> None:
     assert any(
         item.value == "Relevant hazards cannot increase aggression" for item in app.subheader
     )
+
+
+def test_test_lab_renders_local_agent_integration_onboarding() -> None:
+    """The Test Lab page must provide a safe, zero-credential local onboarding bridge."""
+    app = AppTest.from_file(str(PAGE_DIRECTORY / "test_lab.py"), default_timeout=30).run()
+    assert not app.exception
+
+    rendered = " ".join(
+        str(getattr(item, "value", ""))
+        for element_type in ("caption", "markdown", "subheader", "header", "info")
+        for item in app.get(element_type)
+    )
+    assert "Runs on your machine, never in this hosted app" in rendered
+    assert "Python Function" in rendered
+    assert any(b.key == "atlas_lab_download_starter_yaml" for b in app.download_button)
+    assert any("atlas validate atlas.yaml" in item.value for item in app.code)
+
+    # Test selecting each adapter kind via pills
+    adapter_pills = next(item for item in app.pills if item.key == "atlas_lab_adapter_choice")
+    expected_options = {"Python Function", "JSONL Subprocess", "OpenAI-Compatible"}
+    assert set(adapter_pills.options) == expected_options
+
+    adapter_pills.set_value("JSONL Subprocess").run()
+    assert not app.exception
+    assert any("agent_subprocess.py" in item.value for item in app.code)
+
+    adapter_pills.set_value("OpenAI-Compatible").run()
+    assert not app.exception
+    assert any("ATLAS_API_KEY" in item.value for item in app.code)
+    assert any("network_enabled: false" in item.value for item in app.code)
+
+
+def test_test_lab_post_run_promotes_local_agent_bridge_as_step_two() -> None:
+    """After running a live demo test, Test Lab must present Step 2 onboarding directly."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/test_lab.py").run(timeout=30)
+    assert not app.exception
+
+    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
+    app = run_button.click().run(timeout=30)
+    assert not app.exception
+
+    # Confirm certificate rendered
+    assert any(item.value == "Reproducible failure found." for item in app.error)
+
+    # Confirm Step 2 heading and onboarding elements are visibly present post-run
+    assert any(
+        item.value == "Step 2: Test your own agent against this failure mode"
+        for item in app.subheader
+    )
+    assert any(b.key == "atlas_lab_download_starter_yaml" for b in app.download_button)
+    assert any("atlas test --config atlas.yaml" in item.value for item in app.code)

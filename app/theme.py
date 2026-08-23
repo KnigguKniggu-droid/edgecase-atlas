@@ -96,6 +96,43 @@ p { text-wrap: pretty; }
   letter-spacing: 0.08em;
 }
 
+.st-key-atlas_shell_nav {
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 1.2rem;
+  padding: 0.32rem 0.45rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: rgba(10, 19, 29, 0.94);
+  border: 1px solid var(--atlas-line);
+  border-top: 0;
+  border-radius: 0 0 11px 11px;
+  scrollbar-width: thin;
+}
+
+.st-key-atlas_shell_nav [data-testid="stPageLink"] {
+  flex: 1 0 auto;
+}
+
+.st-key-atlas_shell_nav [data-testid="stPageLink"] a {
+  justify-content: center;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 7px;
+  color: var(--atlas-muted);
+  font-family: var(--atlas-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.st-key-atlas_shell_nav [data-testid="stPageLink"] a:hover,
+.st-key-atlas_shell_nav [data-testid="stPageLink"] a[aria-current="page"] {
+  color: var(--atlas-ink);
+  background: var(--atlas-raised);
+  box-shadow: inset 0 -2px 0 var(--atlas-cyan);
+}
+
 [data-testid="stNavigation"] {
   margin-bottom: 1.2rem;
   padding: 0.25rem 0.35rem;
@@ -394,6 +431,17 @@ a:focus-visible,
 [role="combobox"]:focus-visible {
   outline: 3px solid rgba(88, 214, 200, 0.65) !important;
   outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .st-key-atlas_lab_onboarding_section [data-testid="stHorizontalBlock"] {
+    flex-direction: column !important;
+  }
+
+  .st-key-atlas_lab_onboarding_section [data-testid="stColumn"] {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
 }
 
 @media (max-width: 840px) {

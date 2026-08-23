@@ -16,6 +16,7 @@ from streamlit.testing.v1 import AppTest
 APP_PATH = Path(__file__).parents[1] / "app" / "streamlit_app.py"
 UI_PATH = Path(__file__).parents[1] / "app" / "ui.py"
 STREAMLIT_CONFIG_PATH = Path(__file__).parents[1] / ".streamlit" / "config.toml"
+PYPROJECT_PATH = Path(__file__).parents[1] / "pyproject.toml"
 THEME_PATH = Path(__file__).parents[1] / "app" / "theme.py"
 FONT_DIRECTORY = Path(__file__).parents[1] / "app" / "static" / "fonts"
 PAGE_DIRECTORY = Path(__file__).parents[1] / "app" / "app_pages"
@@ -51,6 +52,8 @@ def test_streamlit_config_disables_telemetry_hides_errors_and_meets_button_contr
     assert config["client"]["showErrorDetails"] == "none"
     assert _contrast_ratio(config["theme"]["primaryColor"], "#FFFFFF") >= 4.5
     assert config["server"]["enableStaticServing"] is True
+    project = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+    assert "streamlit==1.61.1" in project["project"]["dependencies"]
     assert config["theme"]["font"] == "'IBM Plex Sans', sans-serif"
     assert config["theme"]["headingFont"] == "'IBM Plex Sans', sans-serif"
     assert config["theme"]["codeFont"] == "'IBM Plex Mono', monospace"

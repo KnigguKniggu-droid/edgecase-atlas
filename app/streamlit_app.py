@@ -34,7 +34,7 @@ _PUBLIC_RUN_SLOTS = threading.BoundedSemaphore(2)
 
 st.set_page_config(
     page_title="EdgeCase Atlas",
-    page_icon=":material/radar:",
+    page_icon="\U0001F9ED",
     layout="wide",
     initial_sidebar_state="collapsed",
     menu_items={

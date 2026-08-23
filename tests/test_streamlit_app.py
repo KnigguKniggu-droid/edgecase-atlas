@@ -84,6 +84,7 @@ def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None
     assert calls.isdisjoint({"file_uploader", "iframe", "connection", "experimental_connection"})
     app_source = APP_PATH.read_text(encoding="utf-8")
     theme_source = THEME_PATH.read_text(encoding="utf-8").lower()
+    assert 'page_icon=":material/' not in app_source
     assert app_source.count("st.html(APP_CSS)") == 1
     assert "<script" not in theme_source
     assert "javascript:" not in theme_source

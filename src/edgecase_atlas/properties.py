@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Final
 
 from edgecase_atlas.models import Action, Counterfactual, Decision, Risk, Scenario
 
@@ -17,7 +18,13 @@ ACTION_AGGRESSION_TRANSITIONS: Mapping[Action, frozenset[Action]] = {
     "proceed": frozenset(),
 }
 _RISK_SEVERITY: Mapping[Risk, int] = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-_NON_CAUSAL_PATHS = frozenset({"scenario_id", "description"})
+NON_CAUSAL_PATHS: Final = frozenset({"scenario_id", "description"})
+
+# The repeated-evaluation gate. Evidence is accepted only when a suspected violation
+# reproduces in at least REQUIRED_REPRODUCTIONS of CONFIRMATION_TRIALS reruns. The engine
+# configuration hash and the public product both publish these, so they live in one place.
+CONFIRMATION_TRIALS: Final = 5
+REQUIRED_REPRODUCTIONS: Final = 4
 _STARTER_RELATION_IDS = {
     "red_signal_no_proceed": "red_signal",
     "hazard_non_aggression": "add_relevant_hazard",
@@ -61,7 +68,7 @@ def _is_isolated(
 ) -> bool:
     """Allow only relation targets and documented identity or derived-description differences."""
     return relation.relation_id == expected_relation_id and all(
-        path in _NON_CAUSAL_PATHS or permitted_target(path)
+        path in NON_CAUSAL_PATHS or permitted_target(path)
         for path in (change.path for change in relation.changed_fields)
     )
 

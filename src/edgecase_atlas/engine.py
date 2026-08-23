@@ -20,7 +20,11 @@ from edgecase_atlas.evaluation import (
 from edgecase_atlas.generation import generate_corpus
 from edgecase_atlas.minimizer import HierarchicalMinimizer, MinimizationResult
 from edgecase_atlas.models import FailureCertificate
-from edgecase_atlas.properties import SafetyProperty
+from edgecase_atlas.properties import (
+    CONFIRMATION_TRIALS,
+    REQUIRED_REPRODUCTIONS,
+    SafetyProperty,
+)
 
 _COVERAGE_ESTIMAND = "search-and-engineering-gate observable coverage"
 
@@ -290,8 +294,8 @@ def _engine_config_hash() -> str:
     return _digest_json(
         {
             "software_version": __version__,
-            "confirmation_trials": 5,
-            "required_reproductions": 4,
+            "confirmation_trials": CONFIRMATION_TRIALS,
+            "required_reproductions": REQUIRED_REPRODUCTIONS,
             "coverage_estimand": _COVERAGE_ESTIMAND,
             "reducer": HierarchicalMinimizer.reducer_vocabulary,
         }

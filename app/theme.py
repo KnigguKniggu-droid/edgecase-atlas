@@ -193,6 +193,30 @@ p { text-wrap: pretty; }
   font-size: 1.08rem;
 }
 
+.st-key-atlas_home_chain {
+  margin: 1.2rem 0;
+  padding: 0.9rem 1.1rem;
+  background: rgba(14, 26, 38, 0.75);
+  border: 1px solid var(--atlas-line);
+  border-left: 3px solid var(--atlas-cyan);
+  border-radius: 9px;
+}
+
+.st-key-atlas_home_chain [data-testid="stCaptionContainer"] {
+  color: var(--atlas-cyan);
+  font-family: var(--atlas-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.st-key-atlas_home_chain [data-testid="stMarkdownContainer"] p {
+  margin: 0.2rem 0 0;
+  color: var(--atlas-ink);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 .st-key-atlas_home_hero {
   position: relative;
   overflow: hidden;

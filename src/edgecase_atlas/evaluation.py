@@ -9,7 +9,12 @@ from time import perf_counter
 from typing import Literal, Protocol, runtime_checkable
 
 from edgecase_atlas.models import Counterfactual, Decision, Scenario
-from edgecase_atlas.properties import PropertyResult, SafetyProperty, evaluate_property
+from edgecase_atlas.properties import (
+    REQUIRED_REPRODUCTIONS,
+    PropertyResult,
+    SafetyProperty,
+    evaluate_property,
+)
 
 EvaluationPhase = Literal["search", "confirmation", "minimization"]
 PairRole = Literal["source", "follow_up"]
@@ -233,7 +238,7 @@ async def evaluate_suspected_violation(
     ledger: CallLedger,
     *,
     phase: EvaluationPhase,
-    required_reproductions: int = 4,
+    required_reproductions: int = REQUIRED_REPRODUCTIONS,
 ) -> ReproductionResult:
     """Apply a declared repeated-evaluation engineering gate to a suspected violation."""
     if not seeds:

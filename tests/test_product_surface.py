@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
+
+from edgecase_atlas.fixtures import known_violation_cases
+from edgecase_atlas.properties import (
+    CONFIRMATION_TRIALS,
+    NON_CAUSAL_PATHS,
+    REQUIRED_REPRODUCTIONS,
+    STARTER_PROPERTY_PACK,
+)
 
 ROOT = Path(__file__).parents[1]
 ENTRYPOINT = ROOT / "app" / "streamlit_app.py"
@@ -111,3 +121,63 @@ def test_responsive_theme_rules_stack_narrow_layouts_and_prevent_horizontal_body
     assert ".st-key-atlas_lab_onboarding_section" in theme_source
     assert "flex-direction: column" in theme_source
     assert "-webkit-overflow-scrolling: touch" in theme_source
+
+
+def test_home_causal_chain_states_only_values_read_from_the_fixture() -> None:
+    """The chain banner must describe the method, never assert a result before the run.
+
+    A hardcoded outcome here would be a fabricated metric on the most-viewed public surface,
+    and it would silently drift the moment the fixture or the reproduction gate changed.
+    """
+    app = AppTest.from_file(str(ENTRYPOINT), default_timeout=60).run()
+    assert not app.exception
+
+    case = next(
+        item for item in known_violation_cases() if item.property_id == "red_signal_no_proceed"
+    )
+    tested_property = next(
+        item for item in STARTER_PROPERTY_PACK if item.property_id == case.property_id
+    )
+    intervention = next(
+        change.model_dump(mode="json")
+        for change in case.counterfactual.changed_fields
+        if change.path not in NON_CAUSAL_PATHS
+    )
+
+    captions = [str(item.value) for item in app.caption]
+    assert "THE CAUSAL EVIDENCE PIPELINE" in captions
+    banner = next(caption for caption in captions if "substantive change" in caption)
+    assert str(intervention["path"]) in banner
+    assert str(intervention["from_value"]) in banner
+    assert str(intervention["to_value"]) in banner
+    assert tested_property.title in banner
+    assert f"{REQUIRED_REPRODUCTIONS} of {CONFIRMATION_TRIALS}" in banner
+
+    # The published stat tiles must agree with the same sources, not restate them as literals.
+    metrics = {str(item.label): str(item.value) for item in app.metric}
+    assert metrics["editable assumptions"] == str(len(STARTER_PROPERTY_PACK))
+    assert metrics["reproduction gate"] == f"{REQUIRED_REPRODUCTIONS}/{CONFIRMATION_TRIALS}"
+
+    # The removed banner asserted an outcome before any run had happened.
+    assert "Decision Flip" not in PAGES["home"].read_text(encoding="utf-8")
+
+
+def test_a_page_test_passes_on_its_own_without_a_prior_entrypoint_load() -> None:
+    """Page tests must not depend on another test having put ``app`` on ``sys.path``.
+
+    Streamlit adds the entrypoint directory itself, so pages import ``product_ui`` and ``theme``
+    bare. Before ``pythonpath`` was declared for pytest, a page test passed only in a full run
+    and failed alone, which hides real breakage behind test ordering.
+    """
+    selected = (
+        "tests/test_streamlit_app.py"
+        "::test_test_lab_renders_local_agent_integration_onboarding"
+    )
+    completed = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "pytest", selected, "-q", "-p", "no:cacheprovider"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr

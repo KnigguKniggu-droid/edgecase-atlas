@@ -9,6 +9,12 @@ import streamlit as st
 
 from edgecase_atlas.fixtures import known_violation_cases
 from edgecase_atlas.models import Counterfactual
+from edgecase_atlas.properties import (
+    CONFIRMATION_TRIALS,
+    NON_CAUSAL_PATHS,
+    REQUIRED_REPRODUCTIONS,
+    STARTER_PROPERTY_PACK,
+)
 from product_ui import (
     DownloadArtifact,
     render_counterfactual_faultline,
@@ -52,6 +58,29 @@ with st.container(key="atlas_home_hero"):
 
 case = next(item for item in known_violation_cases() if item.property_id == "red_signal_no_proceed")
 source, changes, follow_up = _counterfactual_payload(case.counterfactual)
+tested_property = next(
+    item for item in STARTER_PROPERTY_PACK if item.property_id == case.property_id
+)
+intervention = next(
+    change for change in changes if str(change["path"]) not in NON_CAUSAL_PATHS
+)
+
+# Every value here is read from the fixture and the engine gate. Nothing about the outcome is
+# stated in advance, because the run below has not happened yet when this renders.
+with st.container(key="atlas_home_chain"):
+    st.caption("THE CAUSAL EVIDENCE PIPELINE")
+    st.markdown(
+        "**1. Source scenario** &rarr; **2. One controlled change** &rarr; "
+        "**3. Decision change** &rarr; **4. Repeated evidence** &rarr; "
+        "**5. Replayable certificate**"
+    )
+    st.caption(
+        f"Below, the only substantive change is {intervention['path']}, "
+        f"from {intervention['from_value']} to {intervention['to_value']}. "
+        f"The assumption under test is: {tested_property.title}. "
+        f"Atlas accepts a failure only when it reproduces in at least "
+        f"{REQUIRED_REPRODUCTIONS} of {CONFIRMATION_TRIALS} reruns."
+    )
 render_counterfactual_faultline(source, changes, follow_up, key="atlas_home_faultline")
 
 with st.container(horizontal=True, vertical_alignment="center", key="atlas_home_action"):
@@ -130,9 +159,11 @@ if isinstance(stored, DemoArtifacts):
 with st.container(key="atlas_home_proof"):
     st.subheader("One failure becomes a portable debugging artifact")
     columns = st.columns(4)
+    # The first two are read from the pack and the engine gate so they cannot drift into a
+    # false claim. The last two describe fixed structural facts of the hosted surface.
     facts = (
-        ("5", "editable assumptions"),
-        ("4/5", "reproduction gate"),
+        (str(len(STARTER_PROPERTY_PACK)), "editable assumptions"),
+        (f"{REQUIRED_REPRODUCTIONS}/{CONFIRMATION_TRIALS}", "reproduction gate"),
         ("3", "export formats"),
         ("0", "remote model calls"),
     )

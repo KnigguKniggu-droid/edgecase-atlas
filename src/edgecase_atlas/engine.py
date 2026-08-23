@@ -106,10 +106,10 @@ class AtlasEngine:
                 adapter,
                 generated.property,
                 generated.counterfactual,
-                streams.engineering_gate_seeds(5),
+                streams.engineering_gate_seeds(CONFIRMATION_TRIALS),
                 ledger,
                 phase="confirmation",
-                required_reproductions=4,
+                required_reproductions=REQUIRED_REPRODUCTIONS,
             )
             start = ledger.target_calls_total - 2 * len(confirmation.trials)
             for index, trial in enumerate(confirmation.trials, start=1):

@@ -14,7 +14,7 @@ from edgecase_atlas.evaluation import (
 )
 from edgecase_atlas.generation import build_counterfactual
 from edgecase_atlas.models import Actor, Counterfactual, Scenario
-from edgecase_atlas.properties import SafetyProperty
+from edgecase_atlas.properties import REQUIRED_REPRODUCTIONS, SafetyProperty
 
 _LABEL = "1-minimal under the declared reducer set"
 
@@ -160,7 +160,7 @@ class HierarchicalMinimizer:
             seeds,
             ledger,
             phase="minimization",
-            required_reproductions=4,
+            required_reproductions=REQUIRED_REPRODUCTIONS,
         )
 
     async def _try_operation(

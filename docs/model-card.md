@@ -14,7 +14,9 @@ Atlas improves real-agent testing.
 - An OpenAI-compatible endpoint configured by a local operator.
 
 The hosted alpha enables only curated built-in targets. It disables user code, subprocess commands,
-arbitrary HTTP endpoints, and uploads.
+and arbitrary HTTP endpoints. The only accepted upload class is a bounded Atlas JSON run document or
+JSONL trace, which is validated and parsed as inert evidence data and never used to select or reach
+a target.
 
 ## Output contract
 

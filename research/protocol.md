@@ -166,6 +166,59 @@ Simulation-based power analysis must reach at least 80 percent under conservativ
 1.30 rate ratio, block variance, overdispersion, and zero-inflation assumptions. If 12 blocks do not
 pass, the number of blocks increases before preregistration.
 
+## What counts as a positive result
+
+A positive result is defined before execution and is not adjustable afterwards. Each row below is
+the complete condition. Meeting part of a row is not a partial positive result, it is a negative
+result with a descriptive note.
+
+| Hypothesis | Positive result requires all of |
+|---|---|
+| H1 | The blocked paired randomization test rejects `rate ratio <= 1.30` at one-sided alpha 0.05, against the preselected `diversity_criticality_search` comparator, on the charged-target-call axis, with every campaign block contributing and no block excluded after outcomes were seen. |
+| H2 | The blocked paired permutation test on normalized coverage AUC produces a Holm-adjusted p-value below 0.05, computed over the frozen coverage-universe digest recorded in `reproducibility-manifest.yaml`. |
+| H3 | Raw pre-repair proposal feasibility meets its preregistered threshold with the denominator stated, counting every rejected proposal. Post-validation feasibility is a release invariant and cannot substitute. |
+| H4 | Active-factor reduction meets its preregistered threshold across every eligible independently confirmed certificate, with failed minimizations scored as zero, and the paired test survives Holm adjustment. |
+| H5 | The simulator reproduction rate meets its preregistered threshold with the certificate as the inference unit and conversion failures retained in the denominator. This cannot be evaluated in the alpha. |
+
+A positive H1 with a negative H2 through H4 is reported as a positive H1 only. The integration
+claim is supported when H1 is positive and no ablation arm matches Atlas within its confidence
+interval. If a single-component ablation matches Atlas, the credit belongs to that component and
+the integration framing must be dropped from the abstract.
+
+## What would falsify the hypothesis
+
+These are stopping conditions, not caveats. Any one of them requires the corresponding claim to be
+withdrawn from every public artifact, not softened.
+
+| Falsifier | Condition | Consequence |
+|---|---|---|
+| F-A | The point estimate of the H1 rate ratio is at or below 1.0 in the confirmatory blocks. | Atlas is not better than the comparator. The efficiency claim is withdrawn entirely, not restated as a trend. |
+| F-B | The randomization test fails to reject at 1.30 but rejects at 1.0. | The 1.30 margin claim is withdrawn. Only a bare superiority statement survives, and it is labelled as not meeting the preregistered margin. |
+| F-C | A single-component ablation matches Atlas within its confidence interval. | The integration claim is withdrawn. This is falsifier F2 in `prior-art-matrix.md`. |
+| F-D | Coverage AUC does not separate the methods, or separates them in the comparator's favour. | The coverage-guidance claim is withdrawn. Coverage is then reported as a descriptive instrument only. |
+| F-E | Median active-factor reduction is at or below zero across eligible certificates. | The minimization claim is withdrawn. The reducer is then documented as a formatting step. |
+| F-F | Independently confirmed certificates fail to reproduce on the held-out stream at a rate that leaves the 4-of-5 gate indistinguishable from chance for the target's observed output entropy. | The reproduction gate is not evidence. Every certificate produced under it is downgraded to a suspected violation. |
+| F-G | Any accepted certificate is shown to be an artifact of a field the relation was not supposed to change. | The isolation guarantee in `properties._is_isolated` is broken. All affected certificates are retracted and the property pack is re-audited before any further claim. |
+| F-H | Held-out confirmation is executed on seeds that overlap the search or shrink streams. | The confirmation is not independent. The affected results are void, not adjusted. |
+| F-I | Prior work is found that supplies all seven capabilities of the matrix in one workflow for driving reasoning agents. | Falsifier F1 in `prior-art-matrix.md`. The novelty framing is withdrawn and the work is repositioned as a reimplementation or an engineering contribution. |
+
+Falsifiers F-F through F-I do not depend on the confirmatory run. They can fire at any time,
+including before execution, and firing before execution is the cheap outcome.
+
+## Threats to validity that are not falsifiers
+
+These bound interpretation without invalidating the design. They must appear in any write-up.
+
+- The engine-generated scenario space is far narrower than the schema space. `seed-taxonomy.md`
+  section 5 records exactly which dimensions a run can and cannot reach, including the reducer
+  operation that is unreachable from built-in generation.
+- Five editable operational properties are not a driving-safety specification. A violation is a
+  violation of a declared assumption.
+- The target is observed only through a categorical decision. No claim about internal reasoning,
+  explanation faithfulness, or hidden state is available from this design.
+- Text-only static scenarios have no closed-loop consequence, so nothing here speaks to whether a
+  decision would have been recoverable.
+
 ## Later simulator validation
 
 H5 is future construct validation, not alpha execution. About 30 certificates would be selected by

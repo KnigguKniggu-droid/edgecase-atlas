@@ -4,8 +4,10 @@
 
 EdgeCase Atlas is simulated research and debugging software for structured-text decisions. It is
 not a vehicle controller, safety monitor, certification system, or legal-compliance tool. The alpha
-public application exposes only curated synthetic scenarios and the included faulty fixture. It
-does not accept subprocess commands, arbitrary endpoints, user files, or executable code.
+public application runs only curated synthetic scenarios and the included faulty fixture. It does
+not accept subprocess commands, arbitrary endpoints, or executable code. It accepts one bounded
+upload class, Atlas JSON run documents and JSONL traces, which are strictly validated and parsed as
+inert data.
 
 ## Assets
 
@@ -42,7 +44,8 @@ does not accept subprocess commands, arbitrary endpoints, user files, or executa
 | HTML or spreadsheet injection | Reports use autoescaping, no external resources, and structured values. JSONL remains data. | Downstream tools must retain safe import settings. |
 | Evidence tampering | Canonical content identifiers, property digests, model configuration hashes, replay compatibility checks, and exact canonical replay commands reject stable-field tampering. | Volatile latency and unavailable costs are observations, not authenticated semantic identity. |
 | Scientific leakage from adaptive reuse | Search, shrink, and held-out seed streams are disjoint. Four of five is labeled an engineering heuristic. | Small held-out samples can still be uncertain and require exact intervals. |
-| Re-identification | No names, emails, raw IPs, uploads, location traces, or public-record narratives are collected. Public artifacts receive identity scans. | A future public dataset import requires a separate privacy review. |
+| Uploaded evidence artifacts | Uploads are limited to `.json` and `.jsonl` Atlas artifacts of at most 2,000,000 bytes, checked against an allowlisted media type, rejected on duplicate keys, non-finite numbers, excess nesting, or oversized fields, and validated against the canonical run and trace schemas before any value is displayed. Content is parsed with a JSON reader only. It is never imported, executed, forwarded, or written to disk. | A malformed artifact still consumes bounded parse work inside the hosted request and rate limits. |
+| Re-identification | No names, emails, raw IPs, location traces, or public-record narratives are collected. Uploaded artifacts are parsed in memory and never retained. Public artifacts receive identity scans. | A future public dataset import requires a separate privacy review. |
 | Supply-chain compromise | Python 3.12 and bounded dependency ranges are declared. Release verification builds offline where possible. | Dependency integrity still depends on the installation source and lock process. |
 
 ## Privacy and analytics

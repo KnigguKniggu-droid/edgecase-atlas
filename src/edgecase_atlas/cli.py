@@ -52,7 +52,12 @@ from edgecase_atlas.evaluation import (
 from edgecase_atlas.fixtures import FaultyDemonstrationAgent
 from edgecase_atlas.metadrive_export import export_metadrive_abstract
 from edgecase_atlas.models import Counterfactual, FailureCertificate
-from edgecase_atlas.properties import STARTER_PROPERTY_PACK, SafetyProperty
+from edgecase_atlas.properties import (
+    CONFIRMATION_TRIALS,
+    REQUIRED_REPRODUCTIONS,
+    STARTER_PROPERTY_PACK,
+    SafetyProperty,
+)
 from edgecase_atlas.reporting import render_html_report
 from edgecase_atlas.serialization import (
     load_json,
@@ -301,7 +306,7 @@ async def _replay(config: AtlasConfig, certificate: FailureCertificate) -> Repro
     adapter = _build_adapter(config)
     try:
         property_ = _property_by_id(certificate.property_id)
-        if certificate.reproduction_trials != 5:
+        if certificate.reproduction_trials != CONFIRMATION_TRIALS:
             raise ValueError("Alpha replay requires exactly five recorded trials")
         if recompute_certificate_id(certificate) != certificate.certificate_id:
             raise ValueError("Certificate content digest does not match its identifier")
@@ -331,7 +336,7 @@ async def _replay(config: AtlasConfig, certificate: FailureCertificate) -> Repro
             seeds,
             CallLedger(),
             phase="minimization",
-            required_reproductions=4,
+            required_reproductions=REQUIRED_REPRODUCTIONS,
         )
     finally:
         await _close_adapter(adapter)

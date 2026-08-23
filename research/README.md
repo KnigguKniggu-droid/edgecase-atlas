@@ -7,10 +7,22 @@ produces a complete charged-call ledger.
 
 ## Contents
 
-- `protocol.md` defines the benchmark-conditional contribution, methods, evidence flow, and
-  scientific boundaries.
+- `protocol.md` defines the benchmark-conditional contribution, methods, evidence flow,
+  scientific boundaries, what counts as a positive result, and what would falsify each claim.
+- `prior-art-matrix.md` positions the integrated contribution against approach families across the
+  seven capabilities it combines, and states the two falsifiers of the integration claim.
 - `preregistration.md` records the hypotheses, experimental units, estimands, analyses, and
   go or no-go gates that must be frozen before confirmatory work.
+- `preregistration-template.md` is the blank form for any further experiment.
+- `evidence-ledger.md` maps every research claim to a backing artifact and a status. Rows that are
+  verifiable from this repository are pre-filled. Product and launch claims live in
+  `docs/evidence-ledger.md`.
+- `seed-taxonomy.md` documents the scenario space, derived from the code, and separates the schema
+  space, the seed-pack space, and the narrower space a run actually generates.
+- `reproducibility-checklist.md` is the pass or fail gate that must be cleared before any result is
+  released.
+- `card-templates.md` holds blank dataset-card and model-card forms. The filled alpha cards are
+  `docs/dataset-card.md` and `docs/model-card.md`.
 - `baselines.py` validates canonical JSONL evidence and counts every target call.
 - `analysis.py` reduces events to the campaign-block inference unit and counts independently
   confirmed unique signatures.

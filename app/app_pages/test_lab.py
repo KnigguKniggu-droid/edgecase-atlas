@@ -168,12 +168,18 @@ if submitted:
             budget=budget,
             custom_text=custom_text,
         )
-        with st.status("Running the evidence pipeline", expanded=True) as status:
-            st.write("Validating the scenario pair")
-            st.write("Collecting repeated decisions")
-            st.write("Reducing retained factors")
-            artifacts = execute_public_demo(request)
-            status.update(label="Test complete", state="complete", expanded=False)
+        with st.container(key="atlas_lab_status"):
+            with st.status("Running the evidence pipeline", expanded=True) as status:
+                st.write(
+                    f"Validating {len(request.properties)} safety assumption(s) "
+                    "against the scenario pair"
+                )
+                st.write(
+                    f"Collecting repeated decisions with mutation budget {request.budget}"
+                )
+                st.write(f"Reducing retained factors with seed {request.seed}")
+                artifacts = execute_public_demo(request)
+                status.update(label="Test complete", state="complete", expanded=False)
     except ValueError:
         st.error("Select at least one allowed safety assumption and stay within public limits.")
     except PublicRunUnavailable:

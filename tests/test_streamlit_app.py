@@ -98,13 +98,14 @@ def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None
     assert imported_roots.isdisjoint({"httpx", "requests", "socket", "subprocess", "urllib"})
     assert calls.isdisjoint({"iframe", "connection", "experimental_connection"})
     assert direct_calls.isdisjoint({"eval", "exec", "compile"})
-    assert "file_uploader" in calls
+    # The hosted app takes no files at all. Evidence arrives as pasted text through the
+    # same bounded parser, so there is no upload surface on the public deployment.
+    assert "file_uploader" not in calls
+    joined = "".join(sources.values())
+    assert "st.file_uploader(" not in joined
     compare_source = sources[PAGE_DIRECTORY / "compare_runs.py"]
-    assert compare_source.count("st.file_uploader(") == 3
-    assert compare_source.count("ingest_artifact(") == 3
-    assert "st.file_uploader(" not in "\n".join(
-        source for path, source in sources.items() if path != PAGE_DIRECTORY / "compare_runs.py"
-    )
+    assert compare_source.count("ingest_run_document(") == 2
+    assert compare_source.count("ingest_trace(") == 1
 
     app_source = sources[APP_PATH]
     theme_source = THEME_PATH.read_text(encoding="utf-8").lower()
@@ -425,8 +426,8 @@ def test_certificates_page_renders_complete_faultline_evidence() -> None:
 
 
 
-def test_compare_runs_page_handles_sample_and_upload_states() -> None:
-    """Compare Runs page must guide empty/single-upload states and compute sample deltas."""
+def test_compare_runs_page_handles_sample_and_paste_states() -> None:
+    """Compare Runs must guide the empty and partial paste states and compute sample deltas."""
     app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
     app = app.switch_page("app_pages/compare_runs.py").run(timeout=30)
 
@@ -440,11 +441,11 @@ def test_compare_runs_page_handles_sample_and_upload_states() -> None:
     assert any("Compatible run pair verified locally." in item.value for item in app.success)
     assert any(item.value == "What changed between runs" for item in app.subheader)
 
-    # Switch to upload mode and verify empty state guidance
+    # Switch to paste mode and verify empty state guidance
     mode_selector = next(item for item in app.segmented_control if item.key == "atlas_compare_mode")
-    mode_selector.set_value("Upload runs").run()
+    mode_selector.set_value("Paste runs").run()
     assert not app.exception
-    assert any("Upload both Run A and Run B JSON files" in item.value for item in app.caption)
+    assert any("Paste both Run A and Run B" in item.value for item in app.caption)
 
 
 
@@ -559,3 +560,23 @@ def test_home_page_handles_empty_certificates_safely() -> None:
         for item in app.warning
     )
 
+
+
+
+def test_test_lab_in_progress_running_state_displays_request_parameters() -> None:
+    """Test Lab status block must display assumption count, budget, and seed from request."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/test_lab.py").run(timeout=30)
+
+    assert not app.exception
+
+    # Submit form with default inputs (1 property, budget=1, seed=42)
+    submit_button = next(item for item in app.button if item.label == "Run counterfactual test")
+    app = submit_button.click().run(timeout=30)
+
+    assert not app.exception
+    rendered_writes = [str(item.value) for item in app.get("markdown") if hasattr(item, "value")]
+    # Verify the status step messages reflect real request parameters
+    assert any("Validating 1 safety assumption(s)" in text for text in rendered_writes)
+    assert any("mutation budget 1" in text for text in rendered_writes)
+    assert any("seed 42" in text for text in rendered_writes)

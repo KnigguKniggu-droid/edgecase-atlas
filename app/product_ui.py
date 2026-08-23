@@ -367,11 +367,12 @@ def render_privacy_footer(*, key: str) -> None:
     with st.container(key=key):
         with st.container(horizontal=True, key=f"{key}_badges"):
             st.badge("Simulated research only", icon=":material/science:", color="gray")
-            st.badge("No uploaded code executed", icon=":material/code_off:", color="green")
+            st.badge("No file uploads", icon=":material/code_off:", color="green")
             st.badge("No remote model calls", icon=":material/cloud_off:", color="blue")
         st.caption(
-            "Supported uploads are parsed as inert evidence data. The app does not contact "
-            "uploaded endpoints. Safety assumptions remain editable operational checks, not "
+            "The hosted app accepts no file uploads. Pasted evidence text is parsed as inert "
+            "data and never retained. The app contacts no remote endpoint. Safety assumptions "
+            "remain editable operational checks, not "
             "universal laws or certification claims."
         )
 

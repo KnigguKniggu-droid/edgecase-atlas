@@ -13,7 +13,7 @@ The 0.1 alpha targets structured-text scenarios and simulated decision agents. I
 5. Reduce actors, metadata, attributes, numeric deltas, and descriptions while preserving typed constraints and reproduction.
 6. Export canonical JSON, append-only JSONL, and standalone HTML evidence with replay commands.
 
-The included no-key Streamlit application runs only curated synthetic examples and the faulty fixture. It does not expose subprocesses, arbitrary HTTP endpoints, or user code execution. It accepts one bounded upload class, Atlas JSON run documents and JSONL traces of at most 2,000,000 bytes, which are strictly validated and parsed as inert data. Uploaded content is never imported, executed, forwarded, or retained.
+The included no-key Streamlit application runs only curated synthetic examples and the faulty fixture. It does not expose subprocesses, arbitrary HTTP endpoints, user code execution, or file uploads. To compare your own runs there, paste the text of an Atlas JSON run document or JSONL trace, bounded at 2,000,000 bytes and strictly validated. Pasted content is parsed as inert data and is never imported, executed, forwarded, or retained.
 
 ## Quick start
 

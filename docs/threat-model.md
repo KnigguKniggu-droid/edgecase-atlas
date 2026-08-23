@@ -6,8 +6,8 @@ EdgeCase Atlas is simulated research and debugging software for structured-text 
 not a vehicle controller, safety monitor, certification system, or legal-compliance tool. The alpha
 public application runs only curated synthetic scenarios and the included faulty fixture. It does
 not accept subprocess commands, arbitrary endpoints, or executable code. It accepts one bounded
-upload class, Atlas JSON run documents and JSONL traces, which are strictly validated and parsed as
-inert data.
+pasted-text class, Atlas JSON run documents and JSONL traces, which are strictly validated
+and parsed as inert data. The hosted application exposes no file upload control.
 
 ## Assets
 

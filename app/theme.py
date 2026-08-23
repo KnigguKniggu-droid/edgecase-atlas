@@ -421,6 +421,16 @@ textarea {
   gap: 0.35rem;
 }
 
+.st-key-atlas_lab_status {
+  margin: 1.2rem 0;
+}
+
+.st-key-atlas_lab_status [data-testid="stStatusWidget"] {
+  background: rgba(14, 26, 38, 0.85);
+  border: 1px solid var(--atlas-line);
+  border-radius: 11px;
+}
+
 .st-key-atlas_home_action {
   justify-content: center;
   gap: 1rem;

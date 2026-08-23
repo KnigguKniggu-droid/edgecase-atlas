@@ -71,7 +71,8 @@ primaryColor = "#B83A32"
 [server]
 headless = true
 enableStaticServing = true
-maxUploadSize = 2
+# The hosted app exposes no file upload control. This floor is defence in depth only.
+maxUploadSize = 1
 
 [client]
 showErrorDetails = "none"

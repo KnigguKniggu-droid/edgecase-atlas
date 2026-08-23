@@ -8,7 +8,7 @@ from typing import cast
 
 import streamlit as st
 
-from artifact_io import TraceSummary, ingest_artifact
+from artifact_io import MAX_ARTIFACT_BYTES, TraceSummary, ingest_run_document, ingest_trace
 from edgecase_atlas.comparison import compare_run_documents
 from product_ui import (
     render_page_intro,
@@ -25,8 +25,19 @@ def _sample_pair() -> ComparisonPair:
 
 def _run_document(value: object) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
-        raise ValueError("The uploaded file is not an Atlas run document.")
+        raise ValueError("The pasted text is not an Atlas run document.")
     return cast(Mapping[str, object], value)
+
+
+def _as_payload(text: str) -> bytes:
+    """Encode pasted text for the same parser the CLI artifacts go through.
+
+    The 2 MB ceiling and every structural check live in artifact_io, so pasted evidence is
+    bounded and validated exactly like any other artifact rather than on a second code path.
+    """
+    if not text.strip():
+        raise ValueError("Paste an Atlas artifact first.")
+    return text.encode("utf-8")
 
 
 render_page_intro(
@@ -41,7 +52,7 @@ render_page_intro(
 
 mode = st.segmented_control(
     "Comparison source",
-    options=("Sample pair", "Upload runs", "Inspect trace"),
+    options=("Sample pair", "Paste runs", "Inspect trace"),
     default="Sample pair",
     selection_mode="single",
     key="atlas_compare_mode",
@@ -79,86 +90,78 @@ if mode == "Sample pair":
             "compatible demonstration pair."
         )
 
-elif mode == "Upload runs":
-    st.warning(
-        "Uploads are parsed as data only. Atlas never imports, executes, or forwards file content.",
+elif mode == "Paste runs":
+    st.info(
+        "Paste the contents of two run JSON files. The hosted app accepts no file uploads. "
+        "Text is parsed as inert data and never imported, executed, forwarded, or retained.",
         icon=":material/shield:",
     )
     left, right = st.columns(2)
     with left:
-        run_a_file = st.file_uploader(
+        run_a_text = st.text_area(
             "Run A JSON",
-            type=("json",),
-            max_upload_size=2,
+            height=170,
+            placeholder="Paste the contents of runs/RUN.json",
             key="atlas_compare_run_a",
         )
     with right:
-        run_b_file = st.file_uploader(
+        run_b_text = st.text_area(
             "Run B JSON",
-            type=("json",),
-            max_upload_size=2,
+            height=170,
+            placeholder="Paste the contents of a second runs/RUN.json",
             key="atlas_compare_run_b",
         )
 
-    has_a = run_a_file is not None
-    has_b = run_b_file is not None
+    has_a = bool(run_a_text and run_a_text.strip())
+    has_b = bool(run_b_text and run_b_text.strip())
 
     if not has_a and not has_b:
-        st.caption("Upload both Run A and Run B JSON files above to compute the delta.")
+        st.caption(
+            f"Paste both Run A and Run B above to compute the delta. Each is capped at "
+            f"{MAX_ARTIFACT_BYTES:,} bytes."
+        )
     elif has_a and not has_b:
-        st.info("Run A loaded. Please upload Run B JSON to proceed with comparison.")
+        st.info("Run A ready. Paste Run B to proceed with the comparison.")
     elif not has_a and has_b:
-        st.info("Run B loaded. Please upload Run A JSON to proceed with comparison.")
+        st.info("Run B ready. Paste Run A to proceed with the comparison.")
 
     if st.button(
         "Compare validated runs",
         type="primary",
         disabled=not (has_a and has_b),
         icon=":material/difference:",
-        key="atlas_compare_uploaded",
+        key="atlas_compare_pasted",
     ):
         try:
-            assert run_a_file is not None and run_b_file is not None
-            run_a = _run_document(
-                ingest_artifact(
-                    run_a_file.getvalue(), filename=run_a_file.name, media_type=run_a_file.type
-                )
-            )
-            run_b = _run_document(
-                ingest_artifact(
-                    run_b_file.getvalue(), filename=run_b_file.name, media_type=run_b_file.type
-                )
-            )
+            run_a = _run_document(ingest_run_document(_as_payload(run_a_text)))
+            run_b = _run_document(ingest_run_document(_as_payload(run_b_text)))
             comparison = compare_run_documents(run_a, run_b)
         except (TypeError, ValueError):
-            st.error("The files are invalid or incompatible Atlas runs. No content was retained.")
+            st.error("The text is not a pair of valid, compatible Atlas runs. Nothing was kept.")
         else:
             st.session_state["atlas_uploaded_comparison"] = comparison
-    uploaded = st.session_state.get("atlas_uploaded_comparison")
-    if isinstance(uploaded, Mapping):
-        render_run_comparison_delta(uploaded, key="atlas_compare_uploaded_result")
+    pasted = st.session_state.get("atlas_uploaded_comparison")
+    if isinstance(pasted, Mapping):
+        render_run_comparison_delta(pasted, key="atlas_compare_uploaded_result")
 
 else:
     st.info(
         "Inspect the structure of a JSONL trace without displaying scenario text or model output.",
         icon=":material/privacy_tip:",
     )
-    trace_file = st.file_uploader(
+    trace_text = st.text_area(
         "Atlas JSONL trace",
-        type=("jsonl", "ndjson"),
-        max_upload_size=2,
+        height=170,
+        placeholder="Paste the contents of traces/RUN.jsonl",
         key="atlas_compare_trace",
     )
-    if trace_file is not None:
+    if trace_text and trace_text.strip():
         try:
-            parsed_trace = ingest_artifact(
-                trace_file.getvalue(), filename=trace_file.name, media_type=trace_file.type
-            )
+            parsed_trace = ingest_trace(_as_payload(trace_text))
         except (TypeError, ValueError):
             st.error("The trace is invalid. No content was retained.")
         else:
-            if isinstance(parsed_trace, TraceSummary):
-                st.session_state["atlas_trace_summary"] = parsed_trace
+            st.session_state["atlas_trace_summary"] = parsed_trace
     stored_trace = st.session_state.get("atlas_trace_summary")
     if isinstance(stored_trace, TraceSummary):
         first, second, third = st.columns(3)
@@ -170,6 +173,6 @@ else:
         for event_name, count in sorted(stored_trace.event_counts.items()):
             st.write(f"- `{event_name}`: {count}")
     else:
-        st.caption("No trace uploaded yet. Select an Atlas .jsonl trace to inspect event metrics.")
+        st.caption("No trace loaded yet. Paste an Atlas .jsonl trace to inspect event metrics.")
 
 render_privacy_footer(key="atlas_compare_footer")

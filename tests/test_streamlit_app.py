@@ -412,8 +412,6 @@ def test_test_lab_post_run_promotes_local_agent_bridge_as_step_two() -> None:
     assert any("atlas test --config atlas.yaml" in item.value for item in app.code)
 
 
-
-
 def test_certificates_page_renders_complete_faultline_evidence() -> None:
     """The Certificates page must render the source, mutation, and counterfactual cards."""
     app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()

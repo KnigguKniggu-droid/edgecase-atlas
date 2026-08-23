@@ -12,7 +12,6 @@ from streamlit.testing.v1 import AppTest
 from edgecase_atlas.fixtures import known_violation_cases
 from edgecase_atlas.properties import (
     CONFIRMATION_TRIALS,
-    NON_CAUSAL_PATHS,
     REQUIRED_REPRODUCTIONS,
     STARTER_PROPERTY_PACK,
 )
@@ -138,20 +137,13 @@ def test_home_causal_chain_states_only_values_read_from_the_fixture() -> None:
     tested_property = next(
         item for item in STARTER_PROPERTY_PACK if item.property_id == case.property_id
     )
-    intervention = next(
-        change.model_dump(mode="json")
-        for change in case.counterfactual.changed_fields
-        if change.path not in NON_CAUSAL_PATHS
-    )
-
     captions = [str(item.value) for item in app.caption]
     assert "THE CAUSAL EVIDENCE PIPELINE" in captions
-    banner = next(caption for caption in captions if "substantive change" in caption)
-    assert str(intervention["path"]) in banner
-    assert str(intervention["from_value"]) in banner
-    assert str(intervention["to_value"]) in banner
+    banner = next(caption for caption in captions if "assumption under test" in caption)
     assert tested_property.title in banner
-    assert f"{REQUIRED_REPRODUCTIONS} of {CONFIRMATION_TRIALS}" in banner
+
+    # Home spells the gate out rather than importing it, so assert the copy still matches.
+    assert f"at least {REQUIRED_REPRODUCTIONS} of {CONFIRMATION_TRIALS} reruns" in banner
 
     # The published stat tiles must agree with the same sources, not restate them as literals.
     metrics = {str(item.label): str(item.value) for item in app.metric}

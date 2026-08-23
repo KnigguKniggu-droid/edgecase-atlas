@@ -9,12 +9,7 @@ import streamlit as st
 
 from edgecase_atlas.fixtures import known_violation_cases
 from edgecase_atlas.models import Counterfactual
-from edgecase_atlas.properties import (
-    CONFIRMATION_TRIALS,
-    NON_CAUSAL_PATHS,
-    REQUIRED_REPRODUCTIONS,
-    STARTER_PROPERTY_PACK,
-)
+from edgecase_atlas.properties import STARTER_PROPERTY_PACK
 from product_ui import (
     DownloadArtifact,
     render_counterfactual_faultline,
@@ -61,12 +56,16 @@ source, changes, follow_up = _counterfactual_payload(case.counterfactual)
 tested_property = next(
     item for item in STARTER_PROPERTY_PACK if item.property_id == case.property_id
 )
-intervention = next(
-    change for change in changes if str(change["path"]) not in NON_CAUSAL_PATHS
-)
 
-# Every value here is read from the fixture and the engine gate. Nothing about the outcome is
-# stated in advance, because the run below has not happened yet when this renders.
+# The gate is written as text rather than imported from edgecase_atlas.properties. Files under
+# app deploy live from the repository while the hosted environment installs the package, so an
+# app module must never import a symbol added in the same commit. Drift is caught instead by
+# test_home_causal_chain_states_only_values_read_from_the_fixture, which compares this copy
+# against REQUIRED_REPRODUCTIONS and CONFIRMATION_TRIALS.
+GATE_SUMMARY = "at least 4 of 5 reruns"
+GATE_TILE = "4/5"
+
+# Nothing about the outcome is stated in advance, because the run below has not happened yet.
 with st.container(key="atlas_home_chain"):
     st.caption("THE CAUSAL EVIDENCE PIPELINE")
     st.markdown(
@@ -75,11 +74,9 @@ with st.container(key="atlas_home_chain"):
         "**5. Replayable certificate**"
     )
     st.caption(
-        f"Below, the only substantive change is {intervention['path']}, "
-        f"from {intervention['from_value']} to {intervention['to_value']}. "
-        f"The assumption under test is: {tested_property.title}. "
-        f"Atlas accepts a failure only when it reproduces in at least "
-        f"{REQUIRED_REPRODUCTIONS} of {CONFIRMATION_TRIALS} reruns."
+        f"The assumption under test is: {tested_property.title}. Atlas changes one field below, "
+        f"holds every other factor constant, and accepts a failure only when it reproduces in "
+        f"{GATE_SUMMARY}."
     )
 render_counterfactual_faultline(source, changes, follow_up, key="atlas_home_faultline")
 
@@ -163,7 +160,7 @@ with st.container(key="atlas_home_proof"):
     # false claim. The last two describe fixed structural facts of the hosted surface.
     facts = (
         (str(len(STARTER_PROPERTY_PACK)), "editable assumptions"),
-        (f"{REQUIRED_REPRODUCTIONS}/{CONFIRMATION_TRIALS}", "reproduction gate"),
+        (GATE_TILE, "reproduction gate"),
         ("3", "export formats"),
         ("0", "remote model calls"),
     )

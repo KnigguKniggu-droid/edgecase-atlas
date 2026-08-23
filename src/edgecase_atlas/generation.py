@@ -191,6 +191,22 @@ def transform_for_property(
         relation_id = "semantic_paraphrase"
     else:
         raise ValueError(f"No deterministic transformer is defined for {property_id!r}")
+
+    # Add one irrelevant actor to both sides. Every property predicate filters on
+    # relevance == "relevant", so this cannot change an outcome, and it appears on both
+    # scenarios so it never enters changed_fields. Without it nothing in the product ever
+    # produces a background actor, which left remove_background_actor unable to fire even
+    # though the reducer vocabulary published in every certificate advertises it.
+    distractor = Actor(
+        actor_id=f"background-{ordinal}",
+        actor_type="vehicle",
+        relevance="background",
+        lane_relation="oncoming_lane",
+        distance_m=float(rng.randint(30, 90)),
+    )
+    source = source.model_copy(update={"actors": (*source.actors, distractor)})
+    follow_up = follow_up.model_copy(update={"actors": (*follow_up.actors, distractor)})
+
     return build_counterfactual(property_, source, follow_up, relation_id)
 
 

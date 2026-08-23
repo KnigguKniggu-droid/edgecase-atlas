@@ -1,22 +1,81 @@
 [theme]
 base = "dark"
-primaryColor = "#1D4ED8"
-backgroundColor = "#0B0F14"
-secondaryBackgroundColor = "#151C24"
-textColor = "#F1F5F9"
-font = "sans-serif"
-codeFont = "monospace"
-baseRadius = "medium"
+primaryColor = "#B83A32"
+backgroundColor = "#07090D"
+secondaryBackgroundColor = "#111721"
+textColor = "#EEF3F8"
+linkColor = "#66D9D0"
+codeTextColor = "#D9F5F2"
+codeBackgroundColor = "#0C1118"
+borderColor = "#2A3544"
+redColor = "#E4544B"
+orangeColor = "#E78343"
+yellowColor = "#F2B84B"
+greenColor = "#42CF8D"
+blueColor = "#66A7E8"
+violetColor = "#AD8AE8"
+grayColor = "#8E9BAB"
+chartCategoricalColors = ["#66D9D0", "#E4544B", "#F2B84B", "#66A7E8", "#AD8AE8", "#42CF8D"]
+dataframeBorderColor = "#2A3544"
+dataframeHeaderBackgroundColor = "#151C26"
+font = "'IBM Plex Sans', sans-serif"
+headingFont = "'IBM Plex Sans', sans-serif"
+codeFont = "'IBM Plex Mono', monospace"
+baseFontSize = 15
+baseFontWeight = 400
+codeFontSize = "0.82rem"
+headingFontSizes = ["42px", "28px", "21px", "17px", "15px", "13px"]
+headingFontWeights = [700, 650, 600, 600, 600, 600]
+linkUnderline = false
+baseRadius = "8px"
+buttonRadius = "7px"
 showWidgetBorder = true
+showSidebarBorder = true
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-Regular-Latin1.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-Medium-Latin1.woff2"
+weight = 500
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-SemiBold-Latin1.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-Bold-Latin1.woff2"
+weight = 700
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/IBMPlexMono-Regular-Latin1.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/IBMPlexMono-SemiBold-Latin1.woff2"
+weight = 600
+[theme.sidebar]
+backgroundColor = "#0C1118"
+secondaryBackgroundColor = "#151C26"
+textColor = "#EEF3F8"
+borderColor = "#2A3544"
+primaryColor = "#B83A32"
 
 [server]
 headless = true
+enableStaticServing = true
 maxUploadSize = 1
 
 [client]
 showErrorDetails = "none"
-toolbarMode = "viewer"
+toolbarMode = "minimal"
 
 [browser]
 gatherUsageStats = false
-

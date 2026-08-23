@@ -16,6 +16,8 @@ from streamlit.testing.v1 import AppTest
 APP_PATH = Path(__file__).parents[1] / "app" / "streamlit_app.py"
 UI_PATH = Path(__file__).parents[1] / "app" / "ui.py"
 STREAMLIT_CONFIG_PATH = Path(__file__).parents[1] / ".streamlit" / "config.toml"
+THEME_PATH = Path(__file__).parents[1] / "app" / "theme.py"
+FONT_DIRECTORY = Path(__file__).parents[1] / "app" / "static" / "fonts"
 
 
 def _load_app_module() -> ModuleType:
@@ -45,6 +47,16 @@ def test_streamlit_config_disables_telemetry_hides_errors_and_meets_button_contr
     assert config["browser"]["gatherUsageStats"] is False
     assert config["client"]["showErrorDetails"] == "none"
     assert _contrast_ratio(config["theme"]["primaryColor"], "#FFFFFF") >= 4.5
+    assert config["server"]["enableStaticServing"] is True
+    assert config["theme"]["font"] == "'IBM Plex Sans', sans-serif"
+    assert config["theme"]["headingFont"] == "'IBM Plex Sans', sans-serif"
+    assert config["theme"]["codeFont"] == "'IBM Plex Mono', monospace"
+    assert "http" not in STREAMLIT_CONFIG_PATH.read_text(encoding="utf-8").lower()
+
+    font_files = tuple(FONT_DIRECTORY.glob("*.woff2"))
+    assert len(font_files) == 6
+    assert all(path.stat().st_size > 10_000 for path in font_files)
+    assert (FONT_DIRECTORY / "OFL.txt").is_file()
 
 
 def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None:
@@ -69,9 +81,21 @@ def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None
     }
 
     assert imported_roots.isdisjoint({"httpx", "requests", "socket", "subprocess", "urllib"})
-    assert calls.isdisjoint(
-        {"file_uploader", "html", "iframe", "connection", "experimental_connection"}
-    )
+    assert calls.isdisjoint({"file_uploader", "iframe", "connection", "experimental_connection"})
+    app_source = APP_PATH.read_text(encoding="utf-8")
+    theme_source = THEME_PATH.read_text(encoding="utf-8").lower()
+    assert app_source.count("st.html(APP_CSS)") == 1
+    assert "<script" not in theme_source
+    assert "javascript:" not in theme_source
+    assert "fonts.googleapis.com" not in theme_source
+    assert "unsafe_allow_javascript" not in app_source
+    assert "#mainmenu" in theme_source
+    assert "visibility: hidden" in theme_source
+    assert "text-transform: uppercase" in theme_source
+    assert "letter-spacing" in theme_source
+    assert "st.table(" in app_source
+    assert "01 generate" in app_source.lower()
+    assert "04 replay" in app_source.lower()
     assert not any(
         keyword.arg == "unsafe_allow_html"
         for node in nodes
@@ -233,18 +257,18 @@ def test_initial_app_is_accessible_and_uses_unique_stable_widget_keys() -> None:
     keys = [item.key for item in widgets]
     assert all(keys)
     assert len(keys) == len(set(keys))
-    assert any(item.label == "Run demonstration" for item in app.button)
+    assert any(item.label == "Run counterfactual test" for item in app.button)
 
 
 def test_submit_runs_no_key_demo_and_renders_certificate() -> None:
     """Breaking the rendered no-key result path must surface an AppTest exception."""
     app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
 
-    run_button = next(item for item in app.button if item.label == "Run demonstration")
+    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
     app = run_button.click().run(timeout=30)
 
     assert not app.exception
-    assert any("Reproducible failure found" in item.value for item in app.success)
+    assert any("Reproducible failure found" in item.value for item in app.error)
     assert {item.label for item in app.metric} == {
         "Reproduction",
         "Charged target calls",
@@ -261,7 +285,7 @@ def test_multiple_certificates_remain_individually_inspectable() -> None:
     app.multiselect[0].set_value(["red_signal_no_proceed", "hazard_non_aggression"])
     next(item for item in app.number_input if item.label == "Test budget").set_value(2)
 
-    run_button = next(item for item in app.button if item.label == "Run demonstration")
+    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
     app = run_button.click().run(timeout=30)
 
     assert not app.exception
@@ -274,7 +298,7 @@ def test_empty_property_selection_is_reported_as_input_validation() -> None:
     app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
     app.multiselect[0].set_value([])
 
-    run_button = next(item for item in app.button if item.label == "Run demonstration")
+    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
     app = run_button.click().run(timeout=30)
 
     assert not app.exception
@@ -309,7 +333,7 @@ def test_curated_sample_selection_changes_the_executed_property() -> None:
     )
     sample_picker.set_value("hazard_non_aggression")
 
-    run_button = next(item for item in app.button if item.label == "Run demonstration")
+    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
     app = run_button.click().run(timeout=30)
 
     assert not app.exception

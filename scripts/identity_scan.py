@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import subprocess
 from dataclasses import dataclass
@@ -28,6 +29,26 @@ REQUIRED_IGNORED_PATHS: Final = (
     PRIVATE_PATTERNS_FILE,
 )
 
+_PUBLIC_BINARY_SHA256: Final = {
+    "app/static/fonts/IBMPlexMono-Regular-Latin1.woff2": (
+        "e8993d946649b9d01abb1ed06d574b19d8ea3e66b5c3948602db335c44c18e56"
+    ),
+    "app/static/fonts/IBMPlexMono-SemiBold-Latin1.woff2": (
+        "b7acd05041ab65f3b7039e218ddd893065e11a07e85ea85019473152a51b6b7d"
+    ),
+    "app/static/fonts/IBMPlexSans-Bold-Latin1.woff2": (
+        "914f1400f363e636b6f9cc7965aa807ff01e93586e1437617525cba0a62aa78d"
+    ),
+    "app/static/fonts/IBMPlexSans-Medium-Latin1.woff2": (
+        "b5610af04d0d4b5a14a621d96d974b993e945a065db1a8861918f69ef9321934"
+    ),
+    "app/static/fonts/IBMPlexSans-Regular-Latin1.woff2": (
+        "b5ad7bd39f996144915f0ad9849a90183b27d8c28ad97ed98af5b1bebc51f6b1"
+    ),
+    "app/static/fonts/IBMPlexSans-SemiBold-Latin1.woff2": (
+        "fff0ab3a88b0b4aa0b693e4f0201359a15183b08e3fa5696d1918d8f0ade8ad5"
+    ),
+}
 _EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 _WINDOWS_PATH = re.compile(
     r"(?i)(?<![A-Z0-9_])(?:[A-Z]:[\\/][^\s\"'<>|]*|"
@@ -195,7 +216,12 @@ def scan_bytes(
     *,
     private_values: tuple[str, ...] = (),
 ) -> list[Finding]:
-    """Fail closed on opaque binary content in publishable artifacts."""
+    """Fail closed except for exact hash-pinned public binary assets."""
+    expected_hash = _PUBLIC_BINARY_SHA256.get(path.as_posix())
+    if expected_hash is not None:
+        if hashlib.sha256(data).hexdigest() == expected_hash:
+            return []
+        return [Finding(path, "opaque_binary")]
     if b"\0" in data:
         return [Finding(path, "opaque_binary")]
     return scan_text(path, data.decode("utf-8", errors="replace"), private_values=private_values)

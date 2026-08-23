@@ -6,12 +6,28 @@ Every public claim must point to a reproducible artifact, recorded observation, 
 |---|---|---|---|
 | E-001 | The demonstration agent yields a minimized certificate in under 60 seconds. | Timed clean-environment run log with hardware and software versions. | Local release smoke passed in 9.53 seconds on August 16, 2026. Clean-environment and public hardware evidence remain pending. |
 | E-002 | A new user can install and generate a first certificate in under 10 minutes. | Two independent tester session timestamps and commands. | Pending |
-| E-003 | A free no-key public demonstration completes successfully. | Logged-out production smoke-test record. | Local no-key Streamlit smoke passed. Production deployment evidence remains pending. |
+| E-003 | A free no-key public demonstration completes successfully. | Logged-out production smoke-test record. | Backed. `scripts/live_smoke.py` loads all five public pages in a headless browser with no session or credentials and fails on a Streamlit error screen. Passed for all five on August 23, 2026 against the deployed commit. Re-runnable on demand. |
 | E-004 | Failures reproduce in at least four of five trials. | Certificate fields plus JSONL trace for each accepted failure. | Local release smoke produced one replayable accepted certificate. A scanned synthetic certificate and standalone report are public under `samples/`. |
 | E-005 | Generated and minimized scenarios satisfy typed constraints. | Automated constraint tests and post-shrink validation results. | Verified by 252 tests on local Python 3.12 and the public clean-wheel CI run on August 22, 2026. |
 | E-006 | Tester, run, return-use, and clarity metrics. | Minimal anonymous event aggregate and written feedback ledger. | Pending |
 | E-007 | Benchmark failure counts and coverage comparisons. | Frozen configs, checksummed traces, analysis scripts, and rendered results. | Pending |
 | E-008 | Repository contains no private identity or research artifacts. | Working tree, Git history, report, deployment, and rendered-page scan. | Working tree, Git authors and committers, history, tags, blobs, generated artifacts, public profile fields, issue content, and release metadata passed. Production Streamlit page scanning remains pending. |
+
+## Current verification, August 23, 2026
+
+Measured on this date against the deployed commit `2158fcb`. Each line is the literal result
+of the command named beside it, not an estimate.
+
+- `python -m pytest -q`: 334 passed.
+- `python -m ruff check .`: all checks passed.
+- `python -m mypy src/edgecase_atlas`: no issues in 19 source files.
+- `python scripts/identity_scan.py`: passed, with the local private-term list present, so the
+  private-term check actually ran rather than silently inspecting nothing.
+- `python scripts/live_smoke.py`: all five public pages rendered cleanly, logged out.
+- `python scripts/verify_release.py`: passed, including a clean wheel build, installation into an isolated environment, and a packaged CLI smoke that produced one certificate.
+
+The figures in the sections below are records of earlier dated runs and are retained as
+history. Where they disagree with the numbers above, the numbers above are current.
 
 ## Local release-candidate evidence
 

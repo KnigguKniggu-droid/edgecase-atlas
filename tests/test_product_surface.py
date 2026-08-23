@@ -185,3 +185,23 @@ def test_research_page_gate_copy_matches_the_published_constants() -> None:
     expected = f"{REQUIRED_REPRODUCTIONS}-of-{CONFIRMATION_TRIALS}"
     assert f'GATE_SUMMARY = "{expected}"' in source
     assert "4-of-5" not in source.replace(f'GATE_SUMMARY = "{expected}"', "")
+
+
+def test_fault_line_text_wraps_on_the_narrowest_supported_screens() -> None:
+    """The fault line must stay legible at 320 to 360px instead of overflowing.
+
+    Its cards pack badges and metrics into horizontal rows, which run past the viewport on the
+    smallest phones. This asserts the narrow-screen rules exist and are scoped to the fault
+    line, so a later edit cannot quietly drop them or widen their blast radius.
+    """
+    theme_source = THEME_PATH.read_text(encoding="utf-8")
+    query = "@media (max-width: 360px)"
+    assert query in theme_source
+
+    # Take just this query, up to whatever rule follows it.
+    remainder = theme_source[theme_source.index(query) + len(query) :]
+    block = remainder.split("@media")[0]
+
+    assert "_faultline" in block
+    assert "flex-wrap: wrap" in block
+    assert "overflow-wrap: anywhere" in block or "word-break: break-word" in block

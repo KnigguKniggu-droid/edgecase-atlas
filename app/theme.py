@@ -525,6 +525,35 @@ a:focus-visible,
   }
 }
 
+@media (max-width: 360px) {
+  [class*="st-key-atlas_"][class*="_faultline"] {
+    padding: 0.75rem 0.6rem;
+  }
+
+  [class*="st-key-atlas_"][class*="_sequence"] {
+    gap: 0.5rem;
+  }
+
+  [class*="st-key-atlas_"][class*="_factors"],
+  [class*="st-key-atlas_"][class*="_metrics"],
+  [class*="st-key-atlas_"][class*="_actors"] {
+    flex-wrap: wrap !important;
+  }
+
+  [class*="st-key-atlas_"][class*="_factors"] [data-testid="stBadge"],
+  [class*="st-key-atlas_"][class*="_actors"] [data-testid="stBadge"],
+  [class*="st-key-atlas_"][class*="_metrics"] [data-testid="stMetricLabel"],
+  [class*="st-key-atlas_"][class*="_metrics"] [data-testid="stMetricValue"] {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  [class*="st-key-atlas_"][class*="_faultline"] [data-testid="stMetric"] {
+    min-height: auto;
+    padding: 0.5rem 0.6rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

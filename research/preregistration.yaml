@@ -1,0 +1,17 @@
+schema_version: atlas-preregistration-v1
+status: draft_not_registered
+results_status: not_run
+title: Constraint-Guided Counterfactual Fuzzing for Reason-Responsive Driving Agents
+primary_hypothesis: {id: H1, estimand: paired_rate_ratio_unique_confirmed_failure_signatures, contrast: atlas_vs_diversity_criticality_search, superiority_margin: 1.30, alpha: 0.05, analysis: paired_randomization_test}
+secondary_hypotheses:
+  - {id: H2, estimand: coverage_auc, analysis: paired_permutation_test}
+  - {id: H3, estimand: constraint_validity_and_non_target_stability, analysis: cluster_bootstrap_ci}
+  - {id: H4, estimand: minimized_active_factor_and_text_reduction, analysis: paired_wilcoxon_and_bootstrap_ci}
+  - {id: H5, estimand: simulator_reproduction_rate, analysis: exact_binomial_and_mcnemar}
+multiplicity: Holm correction applies to H2 through H5.
+experimental_unit: campaign_block
+campaign_blocks: 12
+valid_search_evaluations_per_method_block: 100
+methods: [random_valid_sampling, fixed_metamorphic_templates, unguided_llm_generation, diversity_criticality_search, atlas]
+partitions: {development: 20, pilot: 20, confirmatory: 60}
+no_fabrication: Empty, TBD, and not-run fields remain explicit until produced by an auditable run.

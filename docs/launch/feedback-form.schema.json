@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://edgecase-atlas.invalid/schemas/pilot-feedback-v1.json",
+  "title": "Anonymous EdgeCase Atlas product feedback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pilot_code", "consent_to_anonymous_aggregation", "tested_surface", "completed_demo", "completed_cli_independently", "first_certificate_minutes", "clarity_effect", "most_confusing_step", "highest_priority_improvement", "would_reuse_within_30_days"],
+  "properties": {
+    "pilot_code": {"type": "string", "pattern": "^P-[A-Z0-9]{6}$"},
+    "consent_to_anonymous_aggregation": {"type": "boolean"},
+    "tested_surface": {"enum": ["web", "cli", "both"]},
+    "completed_demo": {"type": "boolean"},
+    "completed_cli_independently": {"type": "boolean"},
+    "first_certificate_minutes": {"type": ["number", "null"], "minimum": 0, "maximum": 240},
+    "clarity_effect": {"enum": ["improved", "unchanged", "worse", "uncertain"]},
+    "most_confusing_step": {"type": "string", "maxLength": 1000},
+    "highest_priority_improvement": {"type": "string", "maxLength": 1000},
+    "would_reuse_within_30_days": {"enum": ["yes", "no", "uncertain"]}
+  }
+}

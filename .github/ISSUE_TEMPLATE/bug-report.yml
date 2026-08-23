@@ -1,0 +1,38 @@
+name: Bug report
+description: Report a reproducible defect using synthetic or public evidence.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Never paste secrets, personal data, private scenarios, or proprietary model outputs.
+  - type: input
+    id: version
+    attributes:
+      label: Atlas version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Minimal replay command
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: public_evidence
+    attributes:
+      label: Sanitized evidence
+      description: Attach only synthetic or public artifacts after scanning them.

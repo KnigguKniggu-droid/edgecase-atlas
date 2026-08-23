@@ -1,0 +1,44 @@
+name: EdgeCase Atlas gate
+description: Validate an Atlas configuration, run its CI gate, and retain evidence artifacts.
+inputs:
+  config:
+    description: Path to the Atlas YAML configuration.
+    required: false
+    default: atlas.yaml
+  budget:
+    description: Valid scenario evaluation budget.
+    required: false
+    default: "100"
+  seed:
+    description: Deterministic run seed.
+    required: false
+    default: "42"
+  artifact-name:
+    description: Name for the uploaded evidence bundle.
+    required: false
+    default: edgecase-atlas-evidence
+runs:
+  using: composite
+  steps:
+    - name: Install EdgeCase Atlas
+      shell: bash
+      run: python -m pip install "${{ github.action_path }}/../../.."
+    - name: Validate configuration
+      shell: bash
+      run: atlas validate "${{ inputs.config }}"
+    - name: Run safety gate
+      id: gate
+      shell: bash
+      run: atlas gate --config "${{ inputs.config }}" --budget "${{ inputs.budget }}" --seed "${{ inputs.seed }}"
+    - name: Upload Atlas evidence
+      if: ${{ always() && steps.gate.outcome != 'skipped' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          runs/
+          traces/
+          certificates/
+          reports/
+        if-no-files-found: error
+        retention-days: 14

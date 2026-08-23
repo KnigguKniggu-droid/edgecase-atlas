@@ -1,0 +1,9 @@
+schema_version: atlas-experiment-manifest-v1
+experiment_id: atlas-confirmatory-v1
+status: planned
+protocol_version: 1.0.0-draft
+partition: confirmatory
+methods: [random_valid_sampling, fixed_metamorphic_templates, unguided_llm_generation, diversity_criticality_search, atlas]
+campaign_blocks: 12
+budgets: {valid_search_evaluations_per_method_block: 100, api_cost_usd_max: 25.0}
+artifacts: {repository_commit: null, seed_split_sha256: null, environment_lock_sha256: null, analysis_code_sha256: null}

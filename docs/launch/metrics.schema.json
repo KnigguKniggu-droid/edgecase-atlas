@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://edgecase-atlas.invalid/schemas/launch-metrics-v1.json",
+  "title": "EdgeCase Atlas launch metrics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["completed_test_runs", "distinct_users", "independent_cli_users", "pilot_respondents", "clarity_positive_respondents", "repeated_users", "public_app_url", "repository_url", "evidence_cutoff_utc"],
+  "properties": {
+    "completed_test_runs": {"type": "integer", "minimum": 0},
+    "distinct_users": {"type": "integer", "minimum": 0},
+    "independent_cli_users": {"type": "integer", "minimum": 0},
+    "pilot_respondents": {"type": "integer", "minimum": 0},
+    "clarity_positive_respondents": {"type": "integer", "minimum": 0},
+    "repeated_users": {"type": "integer", "minimum": 0},
+    "public_app_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+    "repository_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+    "evidence_cutoff_utc": {"type": "string", "format": "date-time"}
+  }
+}

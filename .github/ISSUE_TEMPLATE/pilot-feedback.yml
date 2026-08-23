@@ -1,0 +1,66 @@
+name: Pilot feedback
+description: Report a real EdgeCase Atlas trial without sharing private or identifying data.
+title: "[Pilot] "
+labels: [pilot-feedback]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include names, emails, private datasets, institution details, API keys, or vehicle-control data.
+  - type: dropdown
+    id: role
+    attributes:
+      label: User type
+      options:
+        - University autonomy lab
+        - Student robotics team
+        - Open-source driving-agent developer
+        - AI safety researcher
+        - Other developer or researcher
+    validations:
+      required: true
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Workflow tested
+      options:
+        - Hosted synthetic demonstration
+        - CLI with faulty fixture
+        - CLI with Python function
+        - CLI with JSONL subprocess
+        - CLI with OpenAI-compatible model
+    validations:
+      required: true
+  - type: input
+    id: duration
+    attributes:
+      label: Minutes to first certificate
+      placeholder: Numeric value, or not completed
+    validations:
+      required: true
+  - type: dropdown
+    id: clarity
+    attributes:
+      label: Did the minimized pair improve debugging clarity?
+      options: [Yes, No, Unsure]
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: What happened?
+      description: Describe the workflow, failure, or useful result using synthetic or public information only.
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Highest-value improvement
+    validations:
+      required: true
+  - type: dropdown
+    id: return
+    attributes:
+      label: Would you run Atlas again?
+      options: [Yes, No, Maybe]
+    validations:
+      required: true

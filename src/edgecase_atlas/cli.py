@@ -22,6 +22,7 @@ from edgecase_atlas.adapters import (
     JsonlSubprocessAdapter,
     OpenAICompatibleAdapter,
 )
+from edgecase_atlas.comparison import compare_run_documents, render_comparison_html
 from edgecase_atlas.config import (
     DEFAULT_CONFIG_YAML,
     AtlasConfig,
@@ -46,6 +47,7 @@ from edgecase_atlas.evaluation import (
     model_config_hash,
 )
 from edgecase_atlas.fixtures import FaultyDemonstrationAgent
+from edgecase_atlas.metadrive_export import export_metadrive_abstract
 from edgecase_atlas.models import Counterfactual, FailureCertificate
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK, SafetyProperty
 from edgecase_atlas.reporting import render_html_report
@@ -124,6 +126,42 @@ def test_command(
     typer.echo(f"Certificates: {paths['certificate_count']}")
 
 
+@app.command("gate")
+def gate_command(
+    config_path: Annotated[
+        Path, typer.Option("--config", help="Strict Atlas YAML configuration.")
+    ] = Path("atlas.yaml"),
+    budget: Annotated[int, typer.Option("--budget", min=1, max=100_000)] = 100,
+    seed: Annotated[int, typer.Option("--seed", min=0)] = 42,
+) -> None:
+    """Write all test artifacts and fail CI when a certificate is found."""
+    config = _load_config_or_exit(config_path)
+    try:
+        paths = asyncio.run(_run_test(config, budget=budget, seed=seed))
+    except (
+        AdapterError,
+        ImportError,
+        AttributeError,
+        TemplateError,
+        OSError,
+        TypeError,
+        ValueError,
+    ):
+        _fail("Atlas gate failed. Target details and secrets are not printed.")
+    typer.echo(f"Run: {paths['run']}")
+    typer.echo(f"Trace: {paths['trace']}")
+    typer.echo(f"Report: {paths['report']}")
+    certificate_count = paths["certificate_count"]
+    if not isinstance(certificate_count, int) or isinstance(certificate_count, bool):
+        _fail("Atlas gate failed. Certificate accounting is invalid.")
+    typer.echo(f"Certificates: {certificate_count}")
+    if certificate_count > 0:
+        typer.echo(
+            "Atlas gate rejected this run because failure certificates were found.", err=True
+        )
+        raise typer.Exit(code=1)
+
+
 @app.command("replay")
 def replay_command(
     certificate_path: Path,
@@ -177,6 +215,50 @@ def report_command(
     except (OSError, KeyError, TemplateError, TypeError, ValueError):
         _fail("Atlas report failed. The run artifact is invalid.")
     typer.echo(f"Report: {output}")
+
+
+@app.command("compare")
+def compare_command(
+    run_a: Path,
+    run_b: Path,
+    format_name: Annotated[str, typer.Option("--format")] = "json",
+) -> None:
+    """Compare two compatible canonical run artifacts."""
+    format_name = format_name.casefold()
+    if format_name not in {"json", "html"}:
+        _fail("Only --format json and --format html are supported.")
+    try:
+        comparison = compare_run_documents(load_json(run_a), load_json(run_b))
+        runs = comparison["runs"]
+        if not isinstance(runs, Mapping):
+            raise TypeError("Comparison run identifiers are invalid")
+        run_a_id, run_b_id = str(runs["a"]), str(runs["b"])
+        if not _RUN_ID.fullmatch(run_a_id) or not _RUN_ID.fullmatch(run_b_id):
+            raise ValueError("Comparison run identifiers are invalid")
+        output = Path("comparisons") / f"{run_a_id}-vs-{run_b_id}.{format_name}"
+        if format_name == "json":
+            write_canonical_json(output, comparison)
+        else:
+            render_comparison_html(comparison, output)
+    except (OSError, KeyError, TypeError, ValueError):
+        _fail("Atlas compare failed. Run artifacts are invalid or incompatible.")
+    typer.echo(f"Comparison: {output}")
+
+
+@app.command("export-metadrive")
+def export_metadrive_command(
+    certificate_path: Path,
+    output: Annotated[Path, typer.Option("--output")],
+) -> None:
+    """Export verified abstract evidence for later reviewed MetaDrive construction."""
+    try:
+        certificate = FailureCertificate.model_validate_json(
+            certificate_path.read_text(encoding="utf-8")
+        )
+        write_canonical_json(output, export_metadrive_abstract(certificate))
+    except (OSError, ValidationError, TypeError, ValueError):
+        _fail("Atlas MetaDrive export failed. The certificate is invalid or unsupported.")
+    typer.echo(f"Export: {output}")
 
 
 async def _run_test(config: AtlasConfig, *, budget: int, seed: int) -> dict[str, object]:

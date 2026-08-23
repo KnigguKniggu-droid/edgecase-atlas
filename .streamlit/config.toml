@@ -1,14 +1,14 @@
 [theme]
 base = "dark"
 primaryColor = "#B83A32"
-backgroundColor = "#07090D"
-secondaryBackgroundColor = "#111721"
+backgroundColor = "#060D14"
+secondaryBackgroundColor = "#0E1A26"
 textColor = "#EEF3F8"
 linkColor = "#66D9D0"
 codeTextColor = "#D9F5F2"
 codeBackgroundColor = "#0C1118"
-borderColor = "#2A3544"
-redColor = "#E4544B"
+borderColor = "#26394A"
+redColor = "#FF625B"
 orangeColor = "#E78343"
 yellowColor = "#F2B84B"
 greenColor = "#42CF8D"
@@ -65,13 +65,13 @@ weight = 600
 backgroundColor = "#0C1118"
 secondaryBackgroundColor = "#151C26"
 textColor = "#EEF3F8"
-borderColor = "#2A3544"
+borderColor = "#26394A"
 primaryColor = "#B83A32"
 
 [server]
 headless = true
 enableStaticServing = true
-maxUploadSize = 1
+maxUploadSize = 2
 
 [client]
 showErrorDetails = "none"

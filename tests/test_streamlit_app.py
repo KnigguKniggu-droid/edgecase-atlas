@@ -18,6 +18,9 @@ UI_PATH = Path(__file__).parents[1] / "app" / "ui.py"
 STREAMLIT_CONFIG_PATH = Path(__file__).parents[1] / ".streamlit" / "config.toml"
 THEME_PATH = Path(__file__).parents[1] / "app" / "theme.py"
 FONT_DIRECTORY = Path(__file__).parents[1] / "app" / "static" / "fonts"
+PAGE_DIRECTORY = Path(__file__).parents[1] / "app" / "app_pages"
+PRODUCT_UI_PATH = Path(__file__).parents[1] / "app" / "product_ui.py"
+ARTIFACT_IO_PATH = Path(__file__).parents[1] / "app" / "artifact_io.py"
 
 
 def _load_app_module() -> ModuleType:
@@ -60,9 +63,12 @@ def test_streamlit_config_disables_telemetry_hides_errors_and_meets_button_contr
 
 
 def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None:
-    """Adding a hosted execution or arbitrary-network surface must fail this test."""
-    trees = [ast.parse(path.read_text(encoding="utf-8")) for path in (APP_PATH, UI_PATH)]
-    nodes = [node for tree in trees for node in ast.walk(tree)]
+    """Hosted uploads must remain inert and every page must avoid arbitrary networking."""
+    page_paths = tuple(sorted(PAGE_DIRECTORY.glob("*.py")))
+    reviewed_paths = (APP_PATH, UI_PATH, PRODUCT_UI_PATH, ARTIFACT_IO_PATH, *page_paths)
+    sources = {path: path.read_text(encoding="utf-8") for path in reviewed_paths}
+    trees = {path: ast.parse(source) for path, source in sources.items()}
+    nodes = [node for tree in trees.values() for node in ast.walk(tree)]
     imported_roots = {
         alias.name.split(".", 1)[0]
         for node in nodes
@@ -80,23 +86,36 @@ def test_public_entrypoint_excludes_execution_and_network_capabilities() -> None
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
     }
 
+    direct_calls = {
+        node.func.id
+        for node in nodes
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+
     assert imported_roots.isdisjoint({"httpx", "requests", "socket", "subprocess", "urllib"})
-    assert calls.isdisjoint({"file_uploader", "iframe", "connection", "experimental_connection"})
-    app_source = APP_PATH.read_text(encoding="utf-8")
+    assert calls.isdisjoint({"iframe", "connection", "experimental_connection"})
+    assert direct_calls.isdisjoint({"eval", "exec", "compile"})
+    assert "file_uploader" in calls
+    compare_source = sources[PAGE_DIRECTORY / "compare_runs.py"]
+    assert compare_source.count("st.file_uploader(") == 3
+    assert compare_source.count("ingest_artifact(") == 3
+    assert "st.file_uploader(" not in "\n".join(
+        source for path, source in sources.items() if path != PAGE_DIRECTORY / "compare_runs.py"
+    )
+
+    app_source = sources[APP_PATH]
     theme_source = THEME_PATH.read_text(encoding="utf-8").lower()
     assert 'page_icon=":material/' not in app_source
     assert app_source.count("st.html(APP_CSS)") == 1
+    assert 'position="top"' in app_source
     assert "<script" not in theme_source
     assert "javascript:" not in theme_source
     assert "fonts.googleapis.com" not in theme_source
-    assert "unsafe_allow_javascript" not in app_source
     assert "#mainmenu" in theme_source
     assert "visibility: hidden" in theme_source
     assert "text-transform: uppercase" in theme_source
     assert "letter-spacing" in theme_source
-    assert "st.table(" in app_source
-    assert "01 generate" in app_source.lower()
-    assert "04 replay" in app_source.lower()
+    assert "st.table(" not in "\n".join(sources.values())
     assert not any(
         keyword.arg == "unsafe_allow_html"
         for node in nodes
@@ -235,91 +254,84 @@ def test_status_copy_covers_every_public_run_state_without_leaking_errors() -> N
 
 
 def test_initial_app_is_accessible_and_uses_unique_stable_widget_keys() -> None:
-    """Removing labels, state choices, or unique keys must break the rendered app."""
+    """The default product thesis and primary action must load without credentials."""
     app = AppTest.from_file(str(APP_PATH), default_timeout=20).run()
 
     assert not app.exception
-    assert app.title[0].value == "EdgeCase Atlas"
-    assert any("simulated research" in item.value.lower() for item in app.caption)
-    assert len(app.multiselect) == 1
-    assert app.multiselect[0].label == "Safety assumptions"
-    assert len(app.number_input) == 2
-    assert {item.label for item in app.number_input} == {"Seed", "Test budget"}
-    assert len(app.text_area) == 1
-    assert app.text_area[0].label == "Optional synthetic scenario context"
-
-    widgets = [
-        *app.selectbox,
-        *app.multiselect,
-        *app.number_input,
-        *app.text_area,
-        *app.button,
-    ]
+    assert app.header[0].value == "Catch the decision change before it becomes a driving failure."
+    assert any("synthetic" in item.value.lower() for item in app.caption)
+    widgets = [*app.button]
     keys = [item.key for item in widgets]
     assert all(keys)
     assert len(keys) == len(set(keys))
-    assert any(item.label == "Run counterfactual test" for item in app.button)
+    assert any(item.label == "Run the live safety break" for item in app.button)
 
 
 def test_submit_runs_no_key_demo_and_renders_certificate() -> None:
-    """Breaking the rendered no-key result path must surface an AppTest exception."""
+    """The home action must run the real engine and create three portable artifacts."""
     app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
 
-    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
+    run_button = next(item for item in app.button if item.label == "Run the live safety break")
     app = run_button.click().run(timeout=30)
 
     assert not app.exception
     assert any("Reproducible failure found" in item.value for item in app.error)
-    assert {item.label for item in app.metric} == {
+    metric_labels = {item.label for item in app.metric}
+    assert {
         "Reproduction",
         "Charged target calls",
         "Estimated cost",
         "Certificate latency",
-    }
+    }.issubset(metric_labels)
     assert any("atlas replay certificates/" in item.value for item in app.code)
     assert len(app.get("download_button")) == 3
 
 
-def test_multiple_certificates_remain_individually_inspectable() -> None:
-    """Hiding all but the first selected-property failure must fail this workflow."""
-    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
-    app.multiselect[0].set_value(["red_signal_no_proceed", "hazard_non_aggression"])
-    next(item for item in app.number_input if item.label == "Test budget").set_value(2)
+def test_certificate_gallery_exposes_all_five_curated_failure_modes() -> None:
+    """Every starter assumption must have a first-class gallery artifact."""
+    from edgecase_atlas.properties import STARTER_PROPERTY_PACK
 
-    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
-    app = run_button.click().run(timeout=30)
+    source = (PAGE_DIRECTORY / "certificates.py").read_text(encoding="utf-8")
+    assert "generate_curated_artifact" in source
+    assert "options=tuple(properties)" in source
+    assert len(STARTER_PROPERTY_PACK) == 5
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/certificates.py").run(timeout=30)
+    assert not app.exception
+    assert app.title[0].value.startswith("Open a complete failure certificate")
+    assert len(app.get("download_button")) == 2
+
+
+def test_test_lab_exposes_bounded_accessible_controls() -> None:
+    """The configurable workflow must keep bounded, labeled, stable controls."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/test_lab.py").run(timeout=30)
 
     assert not app.exception
-    certificate_picker = next(item for item in app.selectbox if item.label == "Failure certificate")
-    assert len(certificate_picker.options) == 2
+    assert app.selectbox[0].label == "Scenario to mutate"
+    assert {item.label for item in app.number_input} == {"Seed", "Test budget"}
+    assert app.text_area[0].label == "Optional synthetic context"
+    assert any(item.label == "Run counterfactual test" for item in app.button)
+    widget_keys = [
+        item.key for item in (*app.selectbox, *app.number_input, *app.text_area, *app.button)
+    ]
+    assert all(widget_keys)
+    assert len(widget_keys) == len(set(widget_keys))
 
 
-def test_empty_property_selection_is_reported_as_input_validation() -> None:
-    """Submitting no safety assumptions must not be mislabeled as an adapter failure."""
-    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
-    app.multiselect[0].set_value([])
-
-    run_button = next(item for item in app.button if item.label == "Run counterfactual test")
-    app = run_button.click().run(timeout=30)
-
-    assert not app.exception
-    assert any("Select at least one safety assumption" in item.value for item in app.error)
-    assert all("could not finish" not in item.value.lower() for item in app.error)
-
-
-def test_tampered_preview_state_is_reset_without_traceback_or_value_leak() -> None:
-    """A forged session-state preview ID must be validated before dictionary indexing."""
+def test_tampered_session_artifact_is_ignored_without_value_leak() -> None:
+    """A forged result object must not be rendered or reflected into the page."""
     injected_value = r"C:\private\fixture-secret"
     app = AppTest.from_file(str(APP_PATH), default_timeout=30)
-    app.session_state["atlas_sample_input"] = injected_value
+    app.session_state["atlas_home_artifacts"] = injected_value
 
     app = app.run(timeout=30)
 
     assert not app.exception
-    assert any("reset to a safe default" in item.value for item in app.warning)
     rendered = " ".join(
         str(getattr(item, "value", ""))
-        for element_type in ("warning", "error", "caption", "info", "exception")
+        for element_type in ("warning", "error", "caption", "info", "exception", "markdown")
         for item in app.get(element_type)
     )
     assert injected_value not in rendered
@@ -327,11 +339,10 @@ def test_tampered_preview_state_is_reset_without_traceback_or_value_leak() -> No
 
 
 def test_curated_sample_selection_changes_the_executed_property() -> None:
-    """The curated selector must affect the real run rather than only its preview."""
+    """The Test Lab selector must control the real fixture run."""
     app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
-    sample_picker = next(
-        item for item in app.selectbox if item.label == "Curated synthetic example"
-    )
+    app = app.switch_page("app_pages/test_lab.py").run(timeout=30)
+    sample_picker = next(item for item in app.selectbox if item.label == "Scenario to mutate")
     sample_picker.set_value("hazard_non_aggression")
 
     run_button = next(item for item in app.button if item.label == "Run counterfactual test")

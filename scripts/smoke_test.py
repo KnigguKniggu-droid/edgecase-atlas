@@ -175,20 +175,16 @@ def _streamlit_smoke(root: Path) -> None:
             if app.exception:
                 raise RuntimeError("Streamlit no-key demonstration failed to load.")
             app = (
-                next(item for item in app.button if item.label == "Run counterfactual test")
+                next(item for item in app.button if item.label == "Run the live safety break")
                 .click()
                 .run(timeout=30)
             )
             reproduced_failure = any(
                 "Reproducible failure found" in item.value for item in app.error
             )
-            if (
-                app.exception
-                or not reproduced_failure
-                or len(app.get("download_button")) != 3
-            ):
+            if app.exception or not reproduced_failure or len(app.get("download_button")) != 3:
                 raise RuntimeError("Streamlit no-key demonstration failed to produce artifacts.")
-            artifacts = app.session_state["atlas_run_artifacts"]
+            artifacts = app.session_state["atlas_home_artifacts"]
             _scan_payloads(
                 {
                     "download.json": artifacts.json_bytes,

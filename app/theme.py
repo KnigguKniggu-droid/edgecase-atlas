@@ -530,6 +530,36 @@ a:focus-visible,
   }
 }
 
+/* A 1440x800 laptop is the most common reviewer viewport. At full hero size the first screen
+   holds only the headline, so nothing that demonstrates the tool is visible before scrolling.
+   Shortening the hero on low-height viewports pulls the causal chain and the fault line up,
+   while taller displays keep the full-scale hero. */
+@media (max-height: 900px) {
+  .st-key-atlas_home_hero {
+    min-height: 0;
+    padding: 1.7rem 2.1rem 1.9rem;
+  }
+
+  .st-key-atlas_home_hero h2 {
+    max-width: 26ch;
+    margin: 0.2rem 0 0.7rem;
+    font-size: clamp(2rem, 3.3vw, 2.85rem);
+  }
+
+  .st-key-atlas_home_hero [data-testid="stMarkdownContainer"] p {
+    font-size: 0.98rem;
+  }
+
+  .st-key-atlas_home_hero::after {
+    display: none;
+  }
+
+  .st-key-atlas_home_chain {
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.95rem;
+  }
+}
+
 @media (max-width: 840px) {
   [data-testid="stAppViewBlockContainer"] {
     padding: 0.7rem 0.75rem 3rem;

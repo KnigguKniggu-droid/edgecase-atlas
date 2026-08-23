@@ -1,5 +1,9 @@
 # Builder Competition submission fields
 
+> **Superseded by `submission-packet.md`.** That file holds the finished answers for the five
+> fields the application actually asks for, with a measured value and a verification command for
+> every number. This file is kept only for its pre-submission audit checklist below.
+
 Copy this checklist into a private submission worksheet. Do not store credentials, contact details,
 or unpublished application answers in the public repository.
 
@@ -7,12 +11,12 @@ or unpublished application answers in the public repository.
 |---|---|---|
 | Project name | EdgeCase Atlas | Fixed |
 | One-line description | Property-based red-team testing for AI driving-decision agents. | Review form limit |
-| Public application URL | `TBD from verified deployment` | Must work logged out |
+| Public application URL | https://edgecase-atlas.streamlit.app/ | Must work logged out |
 | Public repository URL | `https://github.com/KnigguKniggu-droid/edgecase-atlas` | Must match reviewed commit |
-| One-minute video | `TBD after frame audit` | At most 60.0 seconds |
-| Builder story | `TBD generated STORY.md` | At most 150 words |
+| One-minute video | Script in `submission-packet.md` section 6 | At most 60.0 seconds |
+| Builder story | `submission-packet.md` field 1, 145 words | At most 150 words |
 | Built contribution | Schema, properties, engine, minimizer, adapters, CLI, web demo, reports | Verify in repository |
-| Quantified results | `TBD from validated metrics file` | No projections as results |
+| Quantified results | `submission-packet.md` field 4, engineering results only | No projections as results |
 | Safety boundary | Simulated debugging, not vehicle control or certification | Required |
 | Competition track | Competition-only | No tuition selection |
 | Payment authorization | None | Do not pay |

@@ -73,6 +73,11 @@ if mode == "Sample pair":
                 f"Run A  {pair['run_a_sha256']}\nRun B  {pair['run_b_sha256']}",
                 language=None,
             )
+    else:
+        st.caption(
+            "No comparison loaded yet. Click 'Build the sample comparison' to generate a "
+            "compatible demonstration pair."
+        )
 
 elif mode == "Upload runs":
     st.warning(
@@ -94,10 +99,21 @@ elif mode == "Upload runs":
             max_upload_size=2,
             key="atlas_compare_run_b",
         )
+
+    has_a = run_a_file is not None
+    has_b = run_b_file is not None
+
+    if not has_a and not has_b:
+        st.caption("Upload both Run A and Run B JSON files above to compute the delta.")
+    elif has_a and not has_b:
+        st.info("Run A loaded. Please upload Run B JSON to proceed with comparison.")
+    elif not has_a and has_b:
+        st.info("Run B loaded. Please upload Run A JSON to proceed with comparison.")
+
     if st.button(
         "Compare validated runs",
         type="primary",
-        disabled=run_a_file is None or run_b_file is None,
+        disabled=not (has_a and has_b),
         icon=":material/difference:",
         key="atlas_compare_uploaded",
     ):
@@ -149,6 +165,11 @@ else:
         first.metric("Events", sum(stored_trace.event_counts.values()), border=True)
         second.metric("Run ID", stored_trace.run_id, border=True)
         third.metric("Event types", len(stored_trace.event_counts), border=True)
-        st.bar_chart(stored_trace.event_counts, horizontal=True)
+        st.subheader("Event distribution")
+        st.caption("Event types observed across the trace sequence.")
+        for event_name, count in sorted(stored_trace.event_counts.items()):
+            st.write(f"- `{event_name}`: {count}")
+    else:
+        st.caption("No trace uploaded yet. Select an Atlas .jsonl trace to inspect event metrics.")
 
 render_privacy_footer(key="atlas_compare_footer")

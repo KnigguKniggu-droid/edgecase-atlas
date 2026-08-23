@@ -457,6 +457,32 @@ a:focus-visible,
   outline-offset: 3px;
 }
 
+@media (max-width: 430px) {
+  .st-key-atlas_home_hero {
+    min-height: 0;
+    padding: 1.2rem 0.9rem;
+  }
+
+  .st-key-atlas_home_hero h2 {
+    font-size: 1.85rem;
+    line-height: 1.1;
+  }
+
+  .st-key-atlas_home_hero [data-testid="stMarkdownContainer"] p {
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  .st-key-atlas_home_trust {
+    gap: 0.3rem;
+    margin-top: 0.6rem;
+  }
+
+  .st-key-atlas_home_action {
+    margin: 0.6rem 0;
+  }
+}
+
 @media (max-width: 640px) {
   .st-key-atlas_lab_onboarding_section [data-testid="stHorizontalBlock"] {
     flex-direction: column !important;

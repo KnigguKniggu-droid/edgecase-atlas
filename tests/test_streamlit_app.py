@@ -422,3 +422,140 @@ def test_certificates_page_renders_complete_faultline_evidence() -> None:
     assert any("Certificate JSON" in item.label for item in app.download_button)
     assert any("Complete run JSON" in item.label for item in app.download_button)
 
+
+
+
+def test_compare_runs_page_handles_sample_and_upload_states() -> None:
+    """Compare Runs page must guide empty/single-upload states and compute sample deltas."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/compare_runs.py").run(timeout=30)
+
+    assert not app.exception
+    assert any("No comparison loaded yet" in item.value for item in app.caption)
+
+    # Click build sample comparison
+    build_button = next(item for item in app.button if item.label == "Build the sample comparison")
+    app = build_button.click().run(timeout=30)
+    assert not app.exception
+    assert any("Compatible run pair verified locally." in item.value for item in app.success)
+    assert any(item.value == "What changed between runs" for item in app.subheader)
+
+    # Switch to upload mode and verify empty state guidance
+    mode_selector = next(item for item in app.segmented_control if item.key == "atlas_compare_mode")
+    mode_selector.set_value("Upload runs").run()
+    assert not app.exception
+    assert any("Upload both Run A and Run B JSON files" in item.value for item in app.caption)
+
+
+
+
+def test_research_page_renders_evidence_ledger_before_and_after_calibration() -> None:
+    """Research page must provide an explicit Evidence Ledger tracking measured claims."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/research.py").run(timeout=30)
+
+    assert not app.exception
+    assert any(item.value == "Evidence Ledger" for item in app.subheader)
+    assert len(app.dataframe) >= 1
+
+    # Run the 5-property calibration
+    calib_button = next(
+        item for item in app.button if item.label == "Run the five-property calibration"
+    )
+    app = calib_button.click().run(timeout=30)
+    assert not app.exception
+    assert any(
+        item.value == "Observed reproduction rate by assumption" for item in app.subheader
+    )
+    assert len(app.dataframe) >= 1
+
+
+
+
+def test_certificates_page_handles_deselection_with_recovery_content() -> None:
+    """Deselecting the failure mode pill must render clear recovery guidance."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/certificates.py").run(timeout=30)
+
+    assert not app.exception
+    pills = next(item for item in app.pills if item.key == "atlas_gallery_property")
+    assert pills.value == "red_signal_no_proceed"
+
+    # Deselect the pill via session state
+    app.session_state["atlas_gallery_property"] = None
+    app = app.run(timeout=30)
+    assert not app.exception
+    assert any("A failure mode selection is required" in item.value for item in app.info)
+    assert any(
+        "Red signal requires a non-proceed action" in item.value
+        for item in app.markdown
+    )
+
+
+
+
+def test_home_page_handles_empty_certificates_safely() -> None:
+    """Home page must render honest warning copy when certificates list is empty."""
+    from edgecase_atlas.engine import RunMetadata, RunResult
+    from edgecase_atlas.evaluation import CallLedger
+    from ui import DemoArtifacts
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+
+    fake_doc = {
+        "schema_version": "atlas-run-v1",
+        "metadata": {
+            "run_id": "run-empty-test",
+            "seed": 42,
+            "candidate_budget": 1,
+            "property_ids": ["red_signal_no_proceed"],
+        },
+        "property_pack": [],
+        "call_ledger": {
+            "target_calls_total": 5,
+            "search_calls": 5,
+            "confirmation_calls": 0,
+            "minimization_calls": 0,
+            "estimated_cost_usd": 0.0,
+            "cost_estimate_available": False,
+            "invocations": [],
+        },
+        "coverage": {"estimand": "test", "cells": [], "trajectory": []},
+        "certificates": [],
+    }
+    dummy_meta = RunMetadata(
+        run_id="run-empty-test",
+        seed=42,
+        candidate_budget=1,
+        held_out_confirmation_seed_stream="1",
+        executed_seed_streams=("1",),
+        property_ids=("red_signal_no_proceed",),
+        property_pack_digest="digest",
+        engine_config_hash="hash",
+        confirmation_note="",
+    )
+    dummy_result = RunResult(
+        metadata=dummy_meta,
+        call_ledger=CallLedger(),
+        coverage_estimand="test",
+        coverage_cells=frozenset(),
+        coverage_trajectory=(),
+        certificates=(),
+    )
+    artifacts = DemoArtifacts(
+        run=dummy_result,
+        document=fake_doc,
+        json_bytes=b"{}",
+        jsonl_bytes=b"",
+        html_bytes=b"<html></html>",
+    )
+    app.session_state["atlas_home_artifacts"] = artifacts
+    app = app.run(timeout=30)
+
+    assert not app.exception
+    assert any("No reproducible failure was found." in item.value for item in app.warning)
+    assert any(
+        "This is not evidence that the agent is safe." in item.value
+        for item in app.warning
+    )
+

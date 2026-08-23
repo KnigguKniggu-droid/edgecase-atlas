@@ -56,6 +56,15 @@ with st.container(key="atlas_home_hero"):
         st.badge("Five reruns", color="blue")
         st.badge("Replayable evidence", color="orange")
 
+with st.container(horizontal=True, vertical_alignment="center", key="atlas_home_action"):
+    run_live = st.button(
+        "Run the live safety break",
+        type="primary",
+        icon=":material/play_arrow:",
+        key="atlas_home_run",
+    )
+    st.caption("One click runs the real engine against the included synthetic flawed agent.")
+
 case = next(item for item in known_violation_cases() if item.property_id == "red_signal_no_proceed")
 source, changes, follow_up = _counterfactual_payload(case.counterfactual)
 tested_property = next(
@@ -84,15 +93,6 @@ with st.container(key="atlas_home_chain"):
         f"{GATE_SUMMARY}."
     )
 render_counterfactual_faultline(source, changes, follow_up, key="atlas_home_faultline")
-
-with st.container(horizontal=True, vertical_alignment="center", key="atlas_home_action"):
-    run_live = st.button(
-        "Run the live safety break",
-        type="primary",
-        icon=":material/play_arrow:",
-        key="atlas_home_run",
-    )
-    st.caption("One click runs the real engine against the included synthetic flawed agent.")
 
 if run_live:
     request = validate_public_request(
@@ -124,10 +124,20 @@ if isinstance(stored, DemoArtifacts):
             "Reproducible failure found. The red-signal decision failed the 4-of-5 gate.",
             icon=":material/gpp_bad:",
         )
+        first, second, third = st.columns(3)
+        first.metric("Reproduction", f"{GATE_TILE} reruns", border=True)
+        call_ledger = cast(Mapping[str, object], document["call_ledger"])
+        second.metric(
+            "Charged target calls",
+            call_ledger["target_calls_total"],
+            border=True,
+        )
+        third.metric("Certificate latency", f"{certificate['latency_ms']} ms", border=True)
+
         render_evidence_pipeline(certificate, key="atlas_home_pipeline")
         render_failure_certificate(
             certificate,
-            call_ledger=cast(Mapping[str, object], document["call_ledger"]),
+            call_ledger=call_ledger,
             key="atlas_home_certificate",
         )
         run_id = str(cast(Mapping[str, object], document["metadata"])["run_id"])
@@ -156,6 +166,11 @@ if isinstance(stored, DemoArtifacts):
                 ),
             ),
             key="atlas_home_downloads",
+        )
+    else:
+        st.warning(
+            "No reproducible failure was found. This is not evidence that the agent is safe.",
+            icon=":material/info:",
         )
 
 with st.container(key="atlas_home_proof"):

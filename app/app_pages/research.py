@@ -74,6 +74,68 @@ if isinstance(benchmark, dict):
             language=None,
         )
 
+with st.container(key="atlas_research_ledger"):
+    st.subheader("Evidence Ledger")
+    st.caption("Explicit accounting of demonstrated capabilities vs planned and out-of-scope work.")
+
+    is_calibrated = isinstance(benchmark, dict)
+    status_measured = "Measured" if is_calibrated else "Not yet measured"
+    unrun_note = (
+        "Calibration has not been run yet. Click 'Run the five-property calibration' above."
+    )
+
+    if is_calibrated:
+        assert isinstance(benchmark, dict)
+        cert_count = benchmark["metrics"]["certificate_count"]
+        prop_count = benchmark["metrics"]["property_count"]
+        target_calls = benchmark["metrics"]["target_calls"]
+        cov_cells = benchmark["metrics"]["coverage_cells"]
+        sha = benchmark["artifact_sha256"][:12]
+        ev_trigger = f"{cert_count} of {prop_count} triggered"
+        ev_calls = f"{target_calls} target model invocations"
+        ev_cells = f"{cov_cells} coverage cells explored"
+        ev_sha = f"SHA-256 prefix {sha} verified"
+    else:
+        ev_trigger = unrun_note
+        ev_calls = unrun_note
+        ev_cells = unrun_note
+        ev_sha = unrun_note
+
+    ledger_rows = [
+        {
+            "Claim": "Synthetic failure trigger",
+            "Status": status_measured,
+            "Evidence / Real Value": ev_trigger,
+        },
+        {
+            "Claim": "Target invocation efficiency",
+            "Status": status_measured,
+            "Evidence / Real Value": ev_calls,
+        },
+        {
+            "Claim": "Discrete behavioral coverage",
+            "Status": status_measured,
+            "Evidence / Real Value": ev_cells,
+        },
+        {
+            "Claim": "Deterministic artifact identity",
+            "Status": status_measured,
+            "Evidence / Real Value": ev_sha,
+        },
+        {
+            "Claim": "Comparative baseline superiority",
+            "Status": "Planned",
+            "Evidence / Real Value": "Matched-budget study unexecuted",
+        },
+        {
+            "Claim": "Real-world autonomous vehicle safety",
+            "Status": "Out of scope",
+            "Evidence / Real Value": "Synthetic domain only; no vehicle claims",
+        },
+    ]
+
+    st.dataframe(ledger_rows, hide_index=True, use_container_width=True)
+
 with st.container(key="atlas_research_next"):
     st.subheader("The defensible research step")
     st.markdown(

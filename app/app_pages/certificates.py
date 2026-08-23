@@ -108,5 +108,19 @@ if property_id:
         )
         with st.expander("Reproducibility identity"):
             st.code(f"SHA-256  {artifact['artifact_sha256']}", language=None)
+    else:
+        st.warning(
+            "No reproducible failure certificate was produced for this mode under the current "
+            "sampling budget. This is not evidence that the agent is safe.",
+            icon=":material/info:",
+        )
+else:
+    st.info(
+        "A failure mode selection is required to inspect curated forensic artifacts. "
+        "Select one of the available failure modes above:",
+        icon=":material/touch_app:",
+    )
+    for item in STARTER_PROPERTY_PACK:
+        st.markdown(f"- **{item.title}**: {item.description}")
 
 render_privacy_footer(key="atlas_gallery_footer")

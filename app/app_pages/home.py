@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import streamlit as st
 
 from edgecase_atlas.fixtures import known_violation_cases
-from edgecase_atlas.models import Counterfactual
 from edgecase_atlas.properties import STARTER_PROPERTY_PACK
+
+if TYPE_CHECKING:
+    # Annotation only. Keeping this out of the runtime import graph narrows what this page
+    # needs from the installed package, which the hosted environment resolves separately
+    # from the app files it serves straight out of the repository.
+    from edgecase_atlas.models import Counterfactual
 from product_ui import (
     DownloadArtifact,
     render_counterfactual_faultline,

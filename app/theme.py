@@ -421,6 +421,23 @@ textarea {
   gap: 0.35rem;
 }
 
+.st-key-atlas_gallery_replay {
+  margin: 1.2rem 0;
+  padding: 1.1rem 1.25rem;
+  background: rgba(10, 19, 29, 0.92);
+  border: 1px solid var(--atlas-line);
+  border-left: 4px solid var(--atlas-cyan);
+  border-radius: 12px;
+}
+
+.st-key-atlas_gallery_replay [data-testid="stCaptionContainer"] {
+  color: var(--atlas-cyan);
+  font-family: var(--atlas-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
 .st-key-atlas_lab_status {
   margin: 1.2rem 0;
 }
@@ -439,6 +456,15 @@ textarea {
   background: rgba(14, 26, 38, 0.72);
   border: 1px solid var(--atlas-line);
   border-radius: 11px;
+}
+
+.st-key-atlas_research_ledger [data-testid="stHorizontalBlock"] {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--atlas-line);
+}
+
+.st-key-atlas_research_ledger [data-testid="stHorizontalBlock"]:last-child {
+  border-bottom: none;
 }
 
 .st-key-atlas_home_proof,

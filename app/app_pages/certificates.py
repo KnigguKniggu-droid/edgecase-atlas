@@ -67,6 +67,10 @@ if property_id:
             border=True,
         )
 
+        with st.container(border=True, key="atlas_gallery_replay"):
+            st.caption("Replay and verify this exact failure locally with the Atlas CLI:")
+            st.code(str(certificate["replay_command"]), language="shell", wrap_lines=True)
+
         # Index directly. A silent empty fallback here would render a blank fault line if the
         # certificate schema ever changed, instead of failing where the mismatch happened.
         source_scenario = cast(Mapping[str, object], certificate["source"])

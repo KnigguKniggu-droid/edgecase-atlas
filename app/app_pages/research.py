@@ -84,63 +84,77 @@ with st.container(key="atlas_research_ledger"):
     st.subheader("Evidence Ledger")
     st.caption("Explicit accounting of demonstrated capabilities vs planned and out-of-scope work.")
 
-    is_calibrated = isinstance(benchmark, dict)
-    status_measured = "Measured" if is_calibrated else "Not yet measured"
     unrun_note = (
         "Calibration has not been run yet. Click 'Run the five-property calibration' above."
     )
+    has_benchmark = isinstance(benchmark, dict)
+    metrics_map = benchmark["metrics"] if has_benchmark else None
 
-    if is_calibrated:
-        assert isinstance(benchmark, dict)
-        cert_count = benchmark["metrics"]["certificate_count"]
-        prop_count = benchmark["metrics"]["property_count"]
-        target_calls = benchmark["metrics"]["target_calls"]
-        cov_cells = benchmark["metrics"]["coverage_cells"]
-        sha = benchmark["artifact_sha256"][:12]
-        ev_trigger = f"{cert_count} of {prop_count} triggered"
-        ev_calls = f"{target_calls} target model invocations"
-        ev_cells = f"{cov_cells} coverage cells explored"
-        ev_sha = f"SHA-256 prefix {sha} verified"
+    if (
+        metrics_map is not None
+        and "certificate_count" in metrics_map
+        and "property_count" in metrics_map
+    ):
+        cert_count = metrics_map["certificate_count"]
+        prop_count = metrics_map["property_count"]
+        status_1 = ("Measured", "green")
+        ev_1 = f"{cert_count} of {prop_count} triggered"
     else:
-        ev_trigger = unrun_note
-        ev_calls = unrun_note
-        ev_cells = unrun_note
-        ev_sha = unrun_note
+        status_1 = ("Not yet measured", "gray")
+        ev_1 = unrun_note
 
-    ledger_rows = [
-        {
-            "Claim": "Synthetic failure trigger",
-            "Status": status_measured,
-            "Evidence / Real Value": ev_trigger,
-        },
-        {
-            "Claim": "Target invocation efficiency",
-            "Status": status_measured,
-            "Evidence / Real Value": ev_calls,
-        },
-        {
-            "Claim": "Discrete behavioral coverage",
-            "Status": status_measured,
-            "Evidence / Real Value": ev_cells,
-        },
-        {
-            "Claim": "Deterministic artifact identity",
-            "Status": status_measured,
-            "Evidence / Real Value": ev_sha,
-        },
-        {
-            "Claim": "Comparative baseline superiority",
-            "Status": "Planned",
-            "Evidence / Real Value": "Matched-budget study unexecuted",
-        },
-        {
-            "Claim": "Real-world autonomous vehicle safety",
-            "Status": "Out of scope",
-            "Evidence / Real Value": "Synthetic domain only; no vehicle claims",
-        },
+    if metrics_map is not None and "target_calls" in metrics_map:
+        target_calls = metrics_map["target_calls"]
+        status_2 = ("Measured", "green")
+        ev_2 = f"{target_calls} target model invocations"
+    else:
+        status_2 = ("Not yet measured", "gray")
+        ev_2 = unrun_note
+
+    if metrics_map is not None and "coverage_cells" in metrics_map:
+        cov_cells = metrics_map["coverage_cells"]
+        status_3 = ("Measured", "green")
+        ev_3 = f"{cov_cells} coverage cells explored"
+    else:
+        status_3 = ("Not yet measured", "gray")
+        ev_3 = unrun_note
+
+    if has_benchmark and "artifact_sha256" in benchmark and benchmark["artifact_sha256"]:
+        sha = benchmark["artifact_sha256"][:12]
+        status_4 = ("Measured", "green")
+        ev_4 = f"SHA-256 prefix {sha} verified"
+    else:
+        status_4 = ("Not yet measured", "gray")
+        ev_4 = unrun_note
+
+    rows = [
+        ("Synthetic failure trigger", status_1, ev_1),
+        ("Target invocation efficiency", status_2, ev_2),
+        ("Discrete behavioral coverage", status_3, ev_3),
+        ("Deterministic artifact identity", status_4, ev_4),
+        (
+            "Comparative baseline superiority",
+            ("Planned", "blue"),
+            "Matched-budget study unexecuted",
+        ),
+        (
+            "Real-world autonomous vehicle safety",
+            ("Out of scope", "gray"),
+            "Synthetic domain only; no vehicle claims",
+        ),
     ]
 
-    st.dataframe(ledger_rows, hide_index=True, width="stretch")
+    for claim, (status_text, status_color), evidence in rows:
+        with st.container(key=f"atlas_ledger_row_{claim.lower().replace(' ', '_')}"):
+            col_status, col_claim, col_evidence = st.columns(
+                [1.8, 3.2, 5.0], vertical_alignment="center"
+            )
+            with col_status:
+                st.badge(status_text, color=status_color)
+            with col_claim:
+                st.markdown(f"**{claim}**")
+            with col_evidence:
+                st.caption(evidence)
 
 with st.container(key="atlas_research_next"):
     st.subheader("The defensible research step")

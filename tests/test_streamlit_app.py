@@ -457,7 +457,11 @@ def test_research_page_renders_evidence_ledger_before_and_after_calibration() ->
 
     assert not app.exception
     assert any(item.value == "Evidence Ledger" for item in app.subheader)
-    assert len(app.dataframe) >= 1
+    rendered_md = [str(item.value) for item in app.markdown]
+    assert any("Not yet measured" in text for text in rendered_md)
+    assert any("Planned" in text for text in rendered_md)
+    assert any("Out of scope" in text for text in rendered_md)
+    assert not any(":green-badge[Measured]" in text for text in rendered_md)
 
     # Run the 5-property calibration
     calib_button = next(
@@ -468,8 +472,10 @@ def test_research_page_renders_evidence_ledger_before_and_after_calibration() ->
     assert any(
         item.value == "Observed reproduction rate by assumption" for item in app.subheader
     )
-    assert len(app.dataframe) >= 1
-
+    calibrated_md = [str(item.value) for item in app.markdown]
+    assert any(":green-badge[Measured]" in text for text in calibrated_md)
+    assert any("Planned" in text for text in calibrated_md)
+    assert any("Out of scope" in text for text in calibrated_md)
 
 
 
@@ -580,3 +586,26 @@ def test_test_lab_in_progress_running_state_displays_request_parameters() -> Non
     assert any("Validating 1 safety assumption(s)" in text for text in rendered_writes)
     assert any("mutation budget 1" in text for text in rendered_writes)
     assert any("seed 42" in text for text in rendered_writes)
+
+
+
+
+def test_certificates_page_renders_prominent_replay_command() -> None:
+    """Certificates page must display a dedicated replay command block before the fault line.
+
+    Replayability is the core product promise, so the command has to be the visible takeaway
+    rather than something a reviewer scrolls past. The ordering is asserted against the source,
+    because a rendered-element search alone would still pass if the block moved to the bottom.
+    """
+    source = (PAGE_DIRECTORY / "certificates.py").read_text(encoding="utf-8")
+    assert source.index('key="atlas_gallery_replay"') < source.index(
+        "render_counterfactual_faultline("
+    )
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/certificates.py").run(timeout=30)
+
+    assert not app.exception
+    # Verify replay code block contains the replay CLI command
+    code_blocks = [str(item.value) for item in app.code if hasattr(item, "value")]
+    assert any("atlas replay certificates/" in block for block in code_blocks)

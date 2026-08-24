@@ -147,7 +147,7 @@ def test_home_causal_chain_states_only_values_read_from_the_fixture() -> None:
 
     # The published stat tiles must agree with the same sources, not restate them as literals.
     metrics = {str(item.label): str(item.value) for item in app.metric}
-    assert metrics["editable assumptions"] == str(len(STARTER_PROPERTY_PACK))
+    assert metrics["safety rules you can edit"] == str(len(STARTER_PROPERTY_PACK))
     assert metrics["repeats required to count"] == f"{REQUIRED_REPRODUCTIONS}/{CONFIRMATION_TRIALS}"
 
     # The removed banner asserted an outcome before any run had happened.

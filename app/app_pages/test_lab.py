@@ -93,7 +93,7 @@ def _render_local_agent_onboarding(*, is_post_run: bool) -> None:
 
 render_page_intro(
     eyebrow="TEST LAB / ONE CHANGE AT A TIME",
-    title="Test one operational assumption at a time.",
+    title="Test one safety rule at a time.",
     lede=(
         "Choose a synthetic scenario, freeze non-target factors, and let Atlas reproduce and "
         "shrink the failure."
@@ -177,9 +177,9 @@ if submitted:
                     "against the scenario pair"
                 )
                 st.write(
-                    f"Collecting repeated decisions with mutation budget {request.budget}"
+                    f"Building and checking {request.budget} scenario variation(s)"
                 )
-                st.write(f"Reducing retained factors with seed {request.seed}")
+                st.write(f"Stripping the scenario down, repeat number {request.seed}")
                 artifacts = execute_public_demo(request)
                 status.update(label="Test complete", state="complete", expanded=False)
     except ValueError:

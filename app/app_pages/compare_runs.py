@@ -41,7 +41,7 @@ def _as_payload(text: str) -> bytes:
 
 
 render_page_intro(
-    eyebrow="COMPARE RUNS / EVIDENCE DELTAS",
+    eyebrow="COMPARE RUNS / WHAT CHANGED",
     title="See what changed between two compatible test campaigns.",
     lede=(
         "Compare certificates, charged calls, and observed coverage without sending either "
@@ -207,6 +207,9 @@ else:
         for event_name, count in sorted(stored_trace.event_counts.items()):
             st.write(f"- {readable.get(event_name, event_name)}: {count}")
     else:
-        st.caption("No trace loaded yet. Paste an Atlas .jsonl trace to inspect event metrics.")
+        st.caption(
+            "No trace loaded yet. Paste a trace file to see a summary of what happened "
+            "during the run."
+        )
 
 render_privacy_footer(key="atlas_compare_footer")

@@ -27,7 +27,7 @@ render_page_intro(
     title="Measure the testing method before claiming anything about safety.",
     lede=(
         "This public calibration checks whether the included flawed fixture triggers all five "
-        "operational assumptions under a fixed seed and budget."
+        "safety rules, using the same repeat number and effort every time."
     ),
     key="atlas_research_intro",
 )
@@ -69,7 +69,12 @@ if isinstance(benchmark, dict):
         labels[property_id]: float(rate["rate"] or 0.0) for property_id, rate in rates.items()
     }
     st.subheader("How often each failure repeated")
-    st.bar_chart(chart_data, horizontal=True, x_label="Reproduction rate", y_label="Assumption")
+    st.bar_chart(
+        chart_data,
+        horizontal=True,
+        x_label="How often the failure repeated",
+        y_label="Safety rule",
+    )
     with st.expander("Artifact identity and fixed configuration"):
         st.code(
             "Seed      42\n"
@@ -114,7 +119,7 @@ with st.container(key="atlas_research_ledger"):
     if metrics_map is not None and "target_calls" in metrics_map:
         target_calls = metrics_map["target_calls"]
         status_2 = ("Measured", "green")
-        ev_2 = f"{target_calls} target model invocations"
+        ev_2 = f"the agent was asked {target_calls} times"
     else:
         status_2 = ("Not yet measured", "gray")
         ev_2 = unrun_note
@@ -122,7 +127,7 @@ with st.container(key="atlas_research_ledger"):
     if metrics_map is not None and "coverage_cells" in metrics_map:
         cov_cells = metrics_map["coverage_cells"]
         status_3 = ("Measured", "green")
-        ev_3 = f"{cov_cells} coverage cells explored"
+        ev_3 = f"{cov_cells} different situations explored"
     else:
         status_3 = ("Not yet measured", "gray")
         ev_3 = unrun_note

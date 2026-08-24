@@ -593,8 +593,8 @@ def test_test_lab_in_progress_running_state_displays_request_parameters() -> Non
     rendered_writes = [str(item.value) for item in app.get("markdown") if hasattr(item, "value")]
     # Verify the status step messages reflect real request parameters
     assert any("Validating 1 safety assumption(s)" in text for text in rendered_writes)
-    assert any("mutation budget 1" in text for text in rendered_writes)
-    assert any("seed 42" in text for text in rendered_writes)
+    assert any("1 scenario variation" in text for text in rendered_writes)
+    assert any("repeat number 42" in text for text in rendered_writes)
 
 
 

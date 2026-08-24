@@ -197,7 +197,7 @@ with st.container(key="atlas_home_proof"):
     # The first two are read from the pack and the engine gate so they cannot drift into a
     # false claim. The last two describe fixed structural facts of the hosted surface.
     facts = (
-        (str(len(STARTER_PROPERTY_PACK)), "editable assumptions"),
+        (str(len(STARTER_PROPERTY_PACK)), "safety rules you can edit"),
         (GATE_TILE, "repeats required to count"),
         ("3", "export formats"),
         ("0", "remote model calls"),

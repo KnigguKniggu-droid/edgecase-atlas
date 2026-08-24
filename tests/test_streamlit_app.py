@@ -639,5 +639,23 @@ def test_rejected_paste_leaves_no_stale_comparison_on_screen() -> None:
     app = next(b for b in app.button if b.key == "atlas_compare_pasted").click().run(timeout=30)
 
     assert not app.exception
-    assert any("not a pair of valid" in str(item.value) for item in app.error)
+    assert any("Run A is invalid:" in str(item.value) for item in app.error)
     assert not any(str(item.value) == "What changed between runs" for item in app.subheader)
+
+
+def test_compare_runs_trace_paste_rejection_names_specific_error() -> None:
+    """Trace inspection rejection must report the specific validation error message."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/compare_runs.py").run(timeout=30)
+
+    mode = next(item for item in app.segmented_control if item.key == "atlas_compare_mode")
+    mode.set_value("Inspect trace")
+    app = app.run(timeout=30)
+
+    for area in app.text_area:
+        if area.key == "atlas_compare_trace":
+            area.set_value("this is not a jsonl trace")
+    app = app.run(timeout=30)
+
+    assert not app.exception
+    assert any("Trace is invalid:" in str(item.value) for item in app.error)

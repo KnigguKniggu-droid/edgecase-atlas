@@ -132,17 +132,29 @@ elif mode == "Paste runs":
         icon=":material/difference:",
         key="atlas_compare_pasted",
     ):
+        # Drop the previous result too. Leaving it on screen puts a failure banner directly
+        # above a full delta panel, and nothing tells the reader which runs it came from.
+        st.session_state.pop("atlas_uploaded_comparison", None)
+        run_a: Mapping[str, object] | None = None
+        run_b: Mapping[str, object] | None = None
+
         try:
             run_a = _run_document(ingest_run_document(_as_payload(run_a_text)))
+        except (TypeError, ValueError) as exc:
+            st.error(f"Run A is invalid: {exc}. Nothing was kept.")
+
+        try:
             run_b = _run_document(ingest_run_document(_as_payload(run_b_text)))
-            comparison = compare_run_documents(run_a, run_b)
-        except (TypeError, ValueError):
-            # Drop the previous result too. Leaving it on screen puts a failure banner directly
-            # above a full delta panel, and nothing tells the reader which runs it came from.
-            st.session_state.pop("atlas_uploaded_comparison", None)
-            st.error("The text is not a pair of valid, compatible Atlas runs. Nothing was kept.")
-        else:
-            st.session_state["atlas_uploaded_comparison"] = comparison
+        except (TypeError, ValueError) as exc:
+            st.error(f"Run B is invalid: {exc}. Nothing was kept.")
+
+        if run_a is not None and run_b is not None:
+            try:
+                comparison = compare_run_documents(run_a, run_b)
+            except (TypeError, ValueError) as exc:
+                st.error(f"Run pair is incompatible: {exc}. Nothing was kept.")
+            else:
+                st.session_state["atlas_uploaded_comparison"] = comparison
 
     if not (has_a and has_b):
         st.session_state.pop("atlas_uploaded_comparison", None)
@@ -165,11 +177,11 @@ else:
     if trace_text and trace_text.strip():
         try:
             parsed_trace = ingest_trace(_as_payload(trace_text))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
             # Same reason as above: an invalid paste must not leave the previous trace's
             # metrics standing underneath the error.
             st.session_state.pop("atlas_trace_summary", None)
-            st.error("The trace is invalid. No content was retained.")
+            st.error(f"Trace is invalid: {exc}. No content was retained.")
         else:
             st.session_state["atlas_trace_summary"] = parsed_trace
     else:

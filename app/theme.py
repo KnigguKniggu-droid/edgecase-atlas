@@ -281,11 +281,12 @@ p { text-wrap: pretty; }
 
 [class*="st-key-atlas_"][class*="_faultline"] {
   position: relative;
-  margin: 1.65rem 0;
-  padding: 1.3rem;
-  background: rgba(10, 19, 29, 0.92);
-  border: 1px solid var(--atlas-line);
+  margin: 2rem 0;
+  padding: 1.4rem;
+  background: rgba(10, 19, 29, 0.94);
+  border: 1px solid rgba(255, 98, 91, 0.45);
   border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32), 0 0 24px rgba(255, 98, 91, 0.06);
 }
 
 [class*="st-key-atlas_"][class*="_faultline"]::before {
@@ -631,3 +632,4 @@ a:focus-visible,
 }
 </style>
 """
+

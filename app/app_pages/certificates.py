@@ -31,8 +31,8 @@ render_page_intro(
     eyebrow="CERTIFICATE GALLERY / FIVE FAILURE MODES",
     title="Open a complete failure certificate, not a marketing screenshot.",
     lede=(
-        "Each example is generated from the real engine and included synthetic flawed agent, "
-        "then content-addressed for reproducibility."
+        "Each example is generated from the real engine and includes a synthetic flawed agent, "
+        "then given a unique fingerprint so the result is exactly reproducible."
     ),
     key="atlas_gallery_intro",
 )
@@ -64,13 +64,13 @@ if property_id:
             help="Verified, self-contained failure reproduction records.",
         )
         second.metric(
-            "Target calls",
+            "Times the agent was asked",
             metrics["target_calls"],
             border=True,
             help="Total times the simulated driving agent was asked to decide.",
         )
         third.metric(
-            "Coverage cells",
+            "Situations explored",
             metrics["coverage_cells"],
             border=True,
             help="Distinct driving scenario conditions explored during evaluation.",

@@ -112,7 +112,7 @@ with st.form("atlas_lab_form", border=False):
         key="atlas_lab_sample",
     )
     selected_property_ids = st.pills(
-        "Safety assumptions",
+        "Safety rules to check",
         options=tuple(properties),
         default=("red_signal_no_proceed",),
         selection_mode="multi",

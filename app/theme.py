@@ -658,6 +658,23 @@ button[kind="primary"]:focus-visible {
   }
 }
 
+/* Metric tiles and the run spinner pick up the accent. Motion is opt-in only, so the lift is
+   removed for anyone who has asked their system to reduce motion. */
+[data-testid="stMetric"] {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-testid="stMetric"]:hover {
+    box-shadow: 0 4px 16px rgba(94, 233, 196, 0.15);
+    transform: translateY(-1px);
+  }
+}
+
+[data-testid="stStatusWidget"] svg {
+  stroke: #5ee9c4;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

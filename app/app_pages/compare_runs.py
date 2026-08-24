@@ -79,7 +79,7 @@ if mode == "Sample pair":
             cast(Mapping[str, object], pair["comparison"]),
             key="atlas_compare_sample_result",
         )
-        with st.expander("Artifact identity"):
+        with st.expander("File fingerprints"):
             st.code(
                 f"Run A  {pair['run_a_sha256']}\nRun B  {pair['run_b_sha256']}",
                 language=None,

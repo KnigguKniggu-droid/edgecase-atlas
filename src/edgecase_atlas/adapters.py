@@ -278,6 +278,11 @@ class JsonlSubprocessAdapter:
         return None if self._process is None else self._process.pid
 
     async def decide(self, scenario: Scenario, seed: int) -> Decision:
+        # The JSONL contract is one Scenario object per stdin line, so there is no field to
+        # carry the trial seed without breaking every agent already written against it. A
+        # subprocess target therefore receives byte-identical input on all reruns of the
+        # reproduction gate, and only its own internal randomness can vary between them.
+        # The function and OpenAI-compatible adapters both pass the seed through.
         del seed
         async with self._lock:
             try:

@@ -100,7 +100,8 @@ STARTER_DEFINITIONS: dict[LocalAdapterKind, AdapterStarter] = {
         title="Persistent JSONL Subprocess",
         summary=(
             "Connect any standalone executable reading Scenario JSON from stdin "
-            "and writing Decision JSON to stdout."
+            "and writing Decision JSON to stdout. The protocol carries no trial seed, so "
+            "reruns send identical input and only your agent's own randomness varies."
         ),
         protocol_snippet=SUBPROCESS_PROTOCOL_SNIPPET,
         config_model=AtlasConfig(

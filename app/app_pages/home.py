@@ -121,11 +121,17 @@ if isinstance(stored, DemoArtifacts):
     if certificates:
         certificate = certificates[0]
         st.error(
-            "Reproducible failure found. The red-signal decision failed the 4-of-5 gate.",
+            f"Reproducible failure found. The red-signal decision failed the {GATE_TILE} gate.",
             icon=":material/gpp_bad:",
         )
         first, second, third = st.columns(3)
-        first.metric("Reproduction", f"{GATE_TILE} reruns", border=True)
+        # Read the run's actual reproduction count. Showing the gate threshold here instead
+        # would present a fixed number as this run's measured result.
+        first.metric(
+            "Reproduction",
+            f"{certificate['reproduction_count']}/{certificate['reproduction_trials']} reruns",
+            border=True,
+        )
         call_ledger = cast(Mapping[str, object], document["call_ledger"])
         second.metric(
             "Charged target calls",

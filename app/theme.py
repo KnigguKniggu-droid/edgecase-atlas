@@ -469,6 +469,7 @@ textarea {
   border-bottom: none;
 }
 
+.st-key-atlas_lab_onboarding_section,
 .st-key-atlas_home_proof,
 .st-key-atlas_home_value,
 .st-key-atlas_research_method,

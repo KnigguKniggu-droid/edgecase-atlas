@@ -76,20 +76,26 @@ shrink a failure. Nothing is pre-recorded and nothing is uploaded.
 
 *They ask what happened after launch, with numbers if you have them.*
 
-EdgeCase Atlas launched publicly today, so it has no user base yet. Rather than pad this with
-numbers I do not have, here is what the tool measurably does.
+It launched today, so there is no user base to report. The one person it has helped so far is the
+one who needed it: a developer looking at an agent that just gave a confident, wrong answer and
+having no way to tell whether it was a real fault or a fluke.
 
-In one run against the included faulty agent, evaluating 3,000 agent calls, Atlas produced **60
-accepted failure certificates covering all five safety properties**. Every accepted failure
-reproduced in **5 of 5 reruns**, clearing the 4-of-5 threshold it enforces. After shrinking, the
-**median certificate retains a single causal field difference** between the passing and failing
-scenario, and every one is labelled `1-minimal under the declared reducer set`.
+In that job it works. Pointed at a deliberately faulty agent, it took about **11 seconds from a
+clean install** to turn a single suspicious answer into a certificate that named the one field
+responsible and came with the command to reproduce it.
 
-From a clean install, the packaged command-line tool produces its first certificate in about
-**11 seconds**.
+Across a longer run of **3,000 agent calls**, it found **60 failures spanning all five safety
+rules**. Every one of them reproduced in **5 of 5 reruns**, above the 4-of-5 bar it enforces on
+itself, and after stripping the scenario down the **typical certificate came back with exactly one
+causal difference** between the passing and failing case.
 
-Each certificate carries a replay command. `atlas replay` recomputes the certificate's content
-digest and refuses a tampered or non-canonical record, so the evidence cannot be quietly edited.
+The point of those numbers is not that they are large. It is that none of them are guesses. Every
+failure it reported survived being rerun five times, and every certificate carries the command
+that regenerates it, so anyone can check the claim rather than take my word for it. `atlas replay`
+recomputes the certificate's digest and refuses a record that has been edited.
+
+An honest caveat: that agent was built to fail, so those 60 findings measure that the detector
+works, not that it will find this much in someone else's agent. That study has not been run.
 
 I have deliberately not reported user counts, testers, pilot feedback, benchmark comparisons, or
 any real-world safety result, because none of those exist yet.

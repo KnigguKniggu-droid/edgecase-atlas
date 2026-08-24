@@ -462,6 +462,9 @@ def test_research_page_renders_evidence_ledger_before_and_after_calibration() ->
     assert any("Planned" in text for text in rendered_md)
     assert any("Out of scope" in text for text in rendered_md)
     assert not any(":green-badge[Measured]" in text for text in rendered_md)
+    assert any(
+        "deliberate starting state" in str(item.value) for item in app.info
+    )
 
     # Run the 5-property calibration
     calib_button = next(
@@ -469,6 +472,9 @@ def test_research_page_renders_evidence_ledger_before_and_after_calibration() ->
     )
     app = calib_button.click().run(timeout=30)
     assert not app.exception
+    assert not any(
+        "deliberate starting state" in str(item.value) for item in app.info
+    )
     assert any(
         item.value == "Observed reproduction rate by assumption" for item in app.subheader
     )

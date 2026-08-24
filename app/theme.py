@@ -422,19 +422,20 @@ textarea {
 }
 
 .st-key-atlas_gallery_replay {
-  margin: 1.2rem 0;
-  padding: 1.1rem 1.25rem;
-  background: rgba(10, 19, 29, 0.92);
-  border: 1px solid var(--atlas-line);
-  border-left: 4px solid var(--atlas-cyan);
-  border-radius: 12px;
+  margin: 1.5rem 0 2rem;
+  padding: 1.3rem 1.5rem;
+  background: rgba(14, 26, 38, 0.96);
+  border: 1px solid rgba(88, 214, 200, 0.35);
+  border-left: 5px solid var(--atlas-cyan);
+  border-radius: 13px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.28), 0 0 20px rgba(88, 214, 200, 0.08);
 }
 
 .st-key-atlas_gallery_replay [data-testid="stCaptionContainer"] {
   color: var(--atlas-cyan);
   font-family: var(--atlas-mono);
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
 }
 

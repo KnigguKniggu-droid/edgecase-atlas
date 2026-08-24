@@ -84,6 +84,14 @@ with st.container(key="atlas_research_ledger"):
     st.subheader("Evidence Ledger")
     st.caption("Explicit accounting of demonstrated capabilities vs planned and out-of-scope work.")
 
+    if not isinstance(benchmark, dict):
+        st.info(
+            "This ledger is the deliberate starting state, not a broken result: each "
+            "'Not yet measured' row fills in after you click 'Run the five-property calibration' "
+            "above, while the 'Planned' and 'Out of scope' rows are fixed scope statements.",
+            icon=":material/fact_check:",
+        )
+
     unrun_note = (
         "Calibration has not been run yet. Click 'Run the five-property calibration' above."
     )
@@ -126,16 +134,6 @@ with st.container(key="atlas_research_ledger"):
     else:
         status_4 = ("Not yet measured", "gray")
         ev_4 = unrun_note
-
-    # Before a run, four rows all read the same gray "Not yet measured". Without framing that
-    # looks like a table that failed to load rather than a ledger waiting on a deliberate action.
-    if metrics_map is None:
-        st.info(
-            "Nothing here has been measured yet, which is the point. Every row below starts "
-            "unproven and only changes once the calibration above has actually produced the "
-            "artifact it names.",
-            icon=":material/science:",
-        )
 
     rows = [
         ("Synthetic failure trigger", status_1, ev_1),

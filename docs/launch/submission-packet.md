@@ -3,7 +3,7 @@
 Answers for the five required fields, ready to paste. Every number is measured, and the command
 that reproduces it is listed in section 7.
 
-Verified against commit `921c8bc` on 2026-08-23. Final deadline is August 23, 2026.
+Verified against commit `f9fc7ac` on 2026-08-23. Final deadline is August 23, 2026.
 
 > This file does not authorize submission. A human must review it, fill in their own identity
 > fields, record the video, and submit. See section 8.
@@ -18,22 +18,38 @@ this a competition entry with no tuition-based offer and no payment.
 
 *They ask for: what you built, your role, and the hardest problem you solved.*
 
-**145 words:**
+**Use this one. 147 words, plain language, and it discloses the tooling.**
 
-AI driving agents can give a fluent, confident answer while breaking a basic safety rule.
-EdgeCase Atlas finds those cases and turns each one into evidence another developer can reproduce.
+AI driving agents can give a confident answer and still break a basic safety rule. EdgeCase
+Atlas catches that and turns it into proof another developer can repeat.
 
-It builds two valid scenarios differing in exactly one field, runs a black-box agent on both,
-and accepts a suspected failure only when it repeats in at least four of five reruns. It then
-shrinks the pair until one causal difference remains, and emits a certificate carrying the command
-that replays it.
+It builds two road scenarios that are identical except for one detail, asks the agent what to do
+in each, and compares the answers. If the agent contradicts a safety rule, Atlas does not trust a
+single result. It reruns the case five times and reports it only if it fails at least four. Then
+it strips the scenario down until one difference is left, and saves a file containing the exact
+command that reproduces it.
 
-I designed and built all of it: the scenario schema, the constraint checking, the five safety
-properties, the evaluation engine with full call accounting, the shrinking algorithm, three agent
-adapters, the command-line tool, the no-key web demo, and the offline report.
+I designed the system and every safety rule in it, and used AI coding agents as my implementation
+tools, directing them and reviewing every change.
 
-The hardest problem was refusing to report a failure that would not reproduce. One failing run
-proves nothing about a stochastic model.
+The hardest part was making it throw away findings that would not repeat. One bad answer proves
+nothing.
+
+### Why this version
+
+The earlier draft used "black-box agent", "shrinks the pair", "stochastic", and "1-minimal under
+the declared reducer set". Those are precise, but the competition says judges are often not
+technical, and every one of them is a place a reader stops. This version keeps every fact and
+loses the vocabulary.
+
+It also states the tooling outright. The repository contains
+`docs/superpowers/plans/*.md`, which are written as instructions to an automated implementer, and
+they sit in public next to a sole-authorship claim. Deleting them would not remove them from git
+history. Disclosure costs one sentence and turns a discoverable contradiction into a straight
+answer to the "how you used time and tools" criterion.
+
+If you would rather not disclose, delete that one sentence — but then also remove the
+sole-authorship wording from Field 5, because "built every part of it myself" is not accurate.
 
 ---
 
@@ -84,7 +100,7 @@ any real-world safety result, because none of those exist yet.
 
 *They ask which parts you started, led, designed, organized, or finished.*
 
-I started this from an empty repository and built every part of it myself.
+I started this from an empty repository. I made every design and engineering decision in it, and I used AI coding agents as my implementation tools, directing them plan by plan and reviewing every change before it shipped. The judgement below is mine; a good deal of the typing was not.
 
 **Designed and built**
 - The typed scenario and certificate schema, including the validation that keeps a shrunken
@@ -107,7 +123,7 @@ I started this from an empty repository and built every part of it myself.
   validated parser, shrinking the public attack surface.
 
 **Tested and shipped**
-- 336 automated tests, plus type checking, linting, a privacy scanner, and a release gate that
+- 340 automated tests, plus type checking, linting, a privacy scanner, and a release gate that
   builds a wheel, installs it into a clean environment, and runs the packaged tool end to end.
 - A post-deploy check that loads all five public pages in a headless browser and fails on an
   error screen. I wrote it after shipping a change that passed every local test and still broke
@@ -188,7 +204,7 @@ Sixty seconds. Narration written to be read at a normal pace. Every spoken numbe
 | 4-of-5 reproduction gate | `python -c "from edgecase_atlas.properties import REQUIRED_REPRODUCTIONS, CONFIRMATION_TRIALS"` |
 | 5 shrinking operations | `python -c "from edgecase_atlas.minimizer import HierarchicalMinimizer as m; print(m.reducer_vocabulary)"` |
 | 60 certificates, all 5 properties, 5/5 reproduction, median 1 causal field | `atlas init` then `atlas test --config atlas.yaml --budget 60 --seed 11`, then read `runs/*.json` |
-| 336 tests | `python -m pytest -q` |
+| 340 tests | `python -m pytest -q` |
 | Release gate, clean wheel and isolated install | `python scripts/verify_release.py` |
 | All 5 public pages live | `python scripts/live_smoke.py` |
 

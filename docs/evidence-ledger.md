@@ -15,10 +15,10 @@ Every public claim must point to a reproducible artifact, recorded observation, 
 
 ## Current verification, August 23, 2026
 
-Measured on this date against the deployed commit `2158fcb`. Each line is the literal result
+Measured on this date against the deployed commit `f9fc7ac`. Each line is the literal result
 of the command named beside it, not an estimate.
 
-- `python -m pytest -q`: 334 passed.
+- `python -m pytest -q`: 340 passed.
 - `python -m ruff check .`: all checks passed.
 - `python -m mypy src/edgecase_atlas`: no issues in 19 source files.
 - `python scripts/identity_scan.py`: passed, with the local private-term list present, so the

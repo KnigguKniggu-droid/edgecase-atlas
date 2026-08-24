@@ -388,19 +388,23 @@ p { text-wrap: pretty; }
   border-radius: 10px;
 }
 
+/* White on the deep emerald, which is 5.47 against white. The previous rule painted near-black
+   text over a colour variable, so wherever that variable did not resolve the label vanished
+   into the background. Red is reserved for failure meaning, so the run button should not be red. */
 button[kind="primary"] {
   min-height: 2.9rem;
   padding-inline: 1.25rem;
-  color: #160908 !important;
-  background: var(--atlas-red) !important;
-  border: 1px solid #ff7b74 !important;
+  color: #ffffff !important;
+  background: #0f766e !important;
+  border: 1px solid #14a08f !important;
   border-radius: 8px !important;
-  box-shadow: 0 8px 26px rgba(255, 98, 91, 0.17);
+  box-shadow: 0 8px 26px rgba(15, 118, 110, 0.28);
   font-weight: 700 !important;
 }
 
 button[kind="primary"]:hover {
-  background: #ff7770 !important;
+  background: #14907f !important;
+  color: #ffffff !important;
   transform: translateY(-1px);
 }
 

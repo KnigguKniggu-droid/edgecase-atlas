@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from scripts.identity_scan import (
+    _SECRET,
     PRIVATE_PATTERNS_FILE,
     running_in_ci,
     scan_repository,
@@ -245,3 +246,36 @@ def test_requirements_match_the_project_dependencies() -> None:
 
     assert lines[-1] == ".", "requirements.txt must install this project on every deploy"
     assert lines[:-1] == declared, "requirements.txt drifted from pyproject dependencies"
+
+def test_secret_scan_recognises_the_common_credential_formats() -> None:
+    """Every token format below is one a leak would realistically arrive in.
+
+    The values are assembled at runtime rather than written out, because a literal token
+    shape in this file would be found by the very scanner it is testing. The repository uses
+    the same split-string idiom in scripts/identity_scan.py for the ignored-path list.
+    """
+    leaks = {
+        "openai": "sk" + "-proj-" + "A" * 24,
+        "github": "gh" + "p_" + "B" * 24,
+        "aws": "AK" + "IA" + "C" * 16,
+        "google": "AI" + "za" + "D" * 35,
+        "stripe": "sk" + "_live_" + "E" * 20,
+        "slack": "xo" + "xb-1111111111-2222222222-" + "F" * 24,
+        "huggingface": "hf" + "_" + "G" * 34,
+        "gitlab": "gl" + "pat-" + "H" * 20,
+        "npm": "np" + "m_" + "I" * 36,
+        "telegram": "123456789" + ":AA" + "J" * 33,
+        "jwt": "ey" + "J" + "K" * 12 + ".ey" + "J" + "L" * 12 + "." + "M" * 20,
+    }
+    for name, value in leaks.items():
+        assert _SECRET.search(value), f"{name} credential format is not detected"
+
+    # Things that legitimately appear in this repository must not trip it.
+    benign = (
+        "f54ce18cc0fc592735ebba2cc5c2e7292496722a9468c1e05bfabcd6807ebe27",
+        "case-64445e166d17c168c66b",
+        "The reproduction gate accepts a failure at four of five reruns.",
+        "atlas replay certificates/case-64445e166d17c168c66b.json",
+    )
+    for value in benign:
+        assert not _SECRET.search(value), f"false positive on {value!r}"

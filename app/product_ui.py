@@ -139,7 +139,7 @@ def render_evidence_pipeline(certificate: Mapping[str, object], *, key: str) -> 
     property_title = str(
         property_snapshot.get("title")
         or certificate.get("property_id")
-        or "Selected safety assumption"
+        or "Selected safety rule"
     )
     changes = _meaningful_changes(_mappings(certificate.get("changed_fields")))
     reproduction_count = _integer(certificate.get("reproduction_count"))
@@ -173,7 +173,7 @@ def render_evidence_pipeline(certificate: Mapping[str, object], *, key: str) -> 
             )
             _render_pipeline_stage(
                 "4",
-                "Shrink and package",
+                "Package as replayable evidence",
                 f"Replayable certificate {certificate_id}",
                 color="green",
                 key=f"{key}_stage_4",
@@ -189,7 +189,7 @@ def render_failure_certificate(
     """Render the high-signal result summary for one failure certificate."""
     property_snapshot = _mapping(certificate.get("property"))
     title = str(
-        property_snapshot.get("title") or certificate.get("property_id") or "Safety assumption"
+        property_snapshot.get("title") or certificate.get("property_id") or "Safety rule"
     )
     scope_note = str(property_snapshot.get("scope_note") or "")
     source_decision = _first_mapping(certificate.get("source_decisions"))
@@ -249,7 +249,7 @@ def render_failure_certificate(
             st.caption("Replay exactly")
             st.code(str(replay_command), language="shell", wrap_lines=True)
         st.caption(
-            "This is minimized evidence under the declared reducer set, not a causal proof "
+            "This is the smallest scenario that still triggers the failure — not a causal proof "
             "or a certification claim."
         )
 
@@ -305,7 +305,7 @@ def render_run_comparison_delta(comparison: Mapping[str, object], *, key: str) -
                 help="Prior failure modes that were no longer triggered under Run B.",
             )
             st.metric(
-                "Target calls in run B",
+                "Times the agent was asked (run B)",
                 _display(call_totals.get("b")),
                 _signed_delta(call_totals.get("delta"), "vs run A"),
                 delta_color="off",
@@ -313,7 +313,7 @@ def render_run_comparison_delta(comparison: Mapping[str, object], *, key: str) -
                 help="Total driving agent queries evaluated during the test campaign.",
             )
             st.metric(
-                "Situations explored in run B",
+                "Situations explored (run B)",
                 _format_number(trajectory_auc.get("b")),
                 _signed_delta(trajectory_auc.get("delta"), "vs run A"),
                 delta_color="off",
@@ -322,12 +322,12 @@ def render_run_comparison_delta(comparison: Mapping[str, object], *, key: str) -
             )
         with st.container(horizontal=True, key=f"{key}_coverage"):
             st.badge(
-                f"{len(cells_added)} coverage cells added",
+                f"{len(cells_added)} new situations covered",
                 icon=":material/add_circle:",
                 color="green",
             )
             st.badge(
-                f"{len(cells_removed)} coverage cells removed",
+                f"{len(cells_removed)} situations no longer covered",
                 icon=":material/remove_circle:",
                 color="orange",
             )
@@ -358,7 +358,7 @@ def render_benchmark_result(result: Mapping[str, object], *, key: str) -> None:
             st.metric("Properties tested", str(property_count), border=True)
             st.metric("Failures detected", str(certificate_count), border=True)
             st.metric("Detection rate", f"{detection_rate:.0%}", border=True)
-            st.metric("Target calls", str(target_calls), border=True)
+            st.metric("Times the agent was asked", str(target_calls), border=True)
         if rows:
             st.markdown("**Property results**")
             with st.container(horizontal=True, key=f"{key}_properties"):
@@ -382,9 +382,8 @@ def render_privacy_footer(*, key: str) -> None:
             st.badge("No file uploads", icon=":material/code_off:", color="green")
             st.badge("No remote model calls", icon=":material/cloud_off:", color="blue")
         st.caption(
-            "The hosted app accepts no file uploads. Pasted evidence text is parsed as inert "
-            "data and never retained. The app contacts no remote endpoint. Safety assumptions "
-            "remain editable operational checks, not "
+            "The hosted app accepts no file uploads. Pasted text is read locally and never stored. "
+            "The app contacts no remote endpoint. Safety rules are editable test conditions, not "
             "universal laws or certification claims."
         )
 

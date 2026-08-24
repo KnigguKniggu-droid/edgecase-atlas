@@ -173,7 +173,7 @@ if submitted:
         with st.container(key="atlas_lab_status"):
             with st.status("Running the evidence pipeline", expanded=True) as status:
                 st.write(
-                    f"Validating {len(request.properties)} safety assumption(s) "
+                    f"Checking {len(request.properties)} safety rule(s) "
                     "against the scenario pair"
                 )
                 st.write(
@@ -183,7 +183,7 @@ if submitted:
                 artifacts = execute_public_demo(request)
                 status.update(label="Test complete", state="complete", expanded=False)
     except ValueError:
-        st.error("Select at least one allowed safety assumption and stay within public limits.")
+        st.error("Select at least one safety rule and stay within public limits.")
     except PublicRunUnavailable:
         st.error("The public demonstration is busy. Retry in a moment.")
     else:

@@ -103,9 +103,9 @@ if run_live:
     )
     try:
         with st.status("Testing the controlled change", expanded=True) as status:
-            st.write("Generate a valid pair")
+            st.write("Build a before-and-after scenario pair")
             st.write("Repeat the decisions five times")
-            st.write("Shrink retained factors")
+            st.write("Keep only the factors that matter")
             artifacts = execute_public_demo(request)
             status.update(label="Replayable evidence assembled", state="complete", expanded=False)
     except PublicRunUnavailable:

@@ -75,7 +75,7 @@ if isinstance(benchmark, dict):
         x_label="How often the failure repeated",
         y_label="Safety rule",
     )
-    with st.expander("Artifact identity and fixed configuration"):
+    with st.expander("Fixed settings and file fingerprint"):
         st.code(
             "Seed      42\n"
             "Budget    5 valid candidates\n"

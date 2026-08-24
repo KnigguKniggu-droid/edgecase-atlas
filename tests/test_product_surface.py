@@ -217,3 +217,34 @@ def test_mutation_card_renders_scenario_id_explanation_caption() -> None:
         "scenario identifier changes with every follow-up scenario" in text
         for text in captions
     )
+
+
+def test_completed_run_replaces_the_illustrative_fault_line_with_its_own() -> None:
+    """After a run, the pair on screen must be the one that produced the certificate.
+
+    Home renders an illustrative fixture pair so the page explains itself before anything is
+    run. Leaving that pair up afterwards put a scenario comparison directly above a
+    certificate it did not come from, which is the single most credibility-damaging thing
+    this page could do.
+    """
+    app = AppTest.from_file(str(ENTRYPOINT), default_timeout=60).run()
+    assert not app.exception
+
+    def fault_lines(rendered: object) -> int:
+        return sum(
+            1
+            for item in rendered.subheader  # type: ignore[attr-defined]
+            if "fault line" in str(item.value).lower()
+        )
+
+    assert fault_lines(app) == 1
+
+    run_button = next(item for item in app.button if item.key == "atlas_home_run")
+    app = run_button.click().run(timeout=180)
+    assert not app.exception
+
+    # Exactly one, and it is the certificate's own pair rather than the fixture.
+    assert fault_lines(app) == 1
+    home_source = PAGES["home"].read_text(encoding="utf-8")
+    assert 'key="atlas_home_result_faultline"' in home_source
+    assert 'certificate["minimized_follow_up"]' in home_source

@@ -92,7 +92,6 @@ with st.container(key="atlas_home_chain"):
         f"holds every other factor constant, and accepts a failure only when it reproduces in "
         f"{GATE_SUMMARY}."
     )
-render_counterfactual_faultline(source, changes, follow_up, key="atlas_home_faultline")
 
 if run_live:
     request = validate_public_request(
@@ -115,6 +114,11 @@ if run_live:
         st.session_state["atlas_home_artifacts"] = artifacts
 
 stored = st.session_state.get("atlas_home_artifacts")
+
+# Illustrative pair, shown only until a real run produces its own. Leaving it up after a
+# run would put a scenario pair above a certificate that did not come from it.
+if not isinstance(stored, DemoArtifacts):
+    render_counterfactual_faultline(source, changes, follow_up, key="atlas_home_faultline")
 if isinstance(stored, DemoArtifacts):
     document = stored.document
     certificates = cast(Sequence[Mapping[str, object]], document["certificates"])
@@ -124,6 +128,14 @@ if isinstance(stored, DemoArtifacts):
             f"Reproducible failure found. The red-signal decision failed the {GATE_TILE} gate.",
             icon=":material/gpp_bad:",
         )
+        # The pair this certificate was actually built from, not the illustrative fixture.
+        render_counterfactual_faultline(
+            cast(Mapping[str, object], certificate["source"]),
+            cast(Sequence[Mapping[str, object]], certificate["changed_fields"]),
+            cast(Mapping[str, object], certificate["minimized_follow_up"]),
+            key="atlas_home_result_faultline",
+        )
+
         first, second, third = st.columns(3)
         # Read the run's actual reproduction count. Showing the gate threshold here instead
         # would present a fixed number as this run's measured result.

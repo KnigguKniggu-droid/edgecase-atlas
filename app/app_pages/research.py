@@ -33,18 +33,18 @@ render_page_intro(
 )
 
 with st.container(key="atlas_research_method"):
-    st.subheader("What this public result can establish")
+    st.subheader("What this demonstration does and does not show")
     left, right = st.columns(2)
     with left:
         st.markdown(
-            "**It can establish** that the deterministic generator, repeated evaluator, "
-            "constraint checks, minimizer, and serialization path work together on controlled "
+            "**What it shows:** that the parts of the tool work together end to end on controlled "
             "synthetic failures."
         )
     with right:
         st.markdown(
-            "**It cannot establish** real-world safety, model ranking, commercial readiness, "
-            "or statistical superiority over research baselines."
+            "**What it does not show:** that any vehicle or agent is safe in the real "
+            "world, that one model is better than another, or that this method beats any "
+            "published approach."
         )
 
 if st.button(
@@ -54,9 +54,9 @@ if st.button(
     key="atlas_research_run",
 ):
     with st.status("Running five controlled candidates", expanded=True) as status:
-        st.write("Use seed 42 and one candidate per property")
+        st.write("Test one scenario for each of the five safety rules, using a fixed seed")
         st.write(f"Apply the {GATE_SUMMARY} repeatability gate")
-        st.write("Measure calls, certificates, and observed coverage")
+        st.write("Count the agent calls used, the failures confirmed, and the situations covered")
         st.session_state["atlas_benchmark"] = _benchmark()
         status.update(label="Synthetic calibration complete", state="complete", expanded=False)
 
@@ -68,7 +68,7 @@ if isinstance(benchmark, dict):
     chart_data = {
         labels[property_id]: float(rate["rate"] or 0.0) for property_id, rate in rates.items()
     }
-    st.subheader("Observed reproduction rate by assumption")
+    st.subheader("How often each failure repeated")
     st.bar_chart(chart_data, horizontal=True, x_label="Reproduction rate", y_label="Assumption")
     with st.expander("Artifact identity and fixed configuration"):
         st.code(
@@ -82,7 +82,7 @@ if isinstance(benchmark, dict):
 
 with st.container(key="atlas_research_ledger"):
     st.subheader("Evidence Ledger")
-    st.caption("Explicit accounting of demonstrated capabilities vs planned and out-of-scope work.")
+    st.caption("What this tool has actually shown, what is planned, and what it will never claim.")
 
     if not isinstance(benchmark, dict):
         st.info(

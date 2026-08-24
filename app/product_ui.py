@@ -87,7 +87,7 @@ def render_scenario_card(
             )
             st.badge(
                 f"Visibility: {_display(scenario.get('visibility'))}",
-                icon=":material/visibility:",
+                icon=_visibility_icon(scenario.get("visibility")),
                 color="gray",
             )
         with st.container(horizontal=True, key=f"{key}_metrics"):
@@ -235,7 +235,7 @@ def render_failure_certificate(
                 border=True,
             )
             st.metric(
-                "Charged target calls",
+                "Times the agent was asked",
                 _display(ledger.get("target_calls_total")),
                 border=True,
             )
@@ -292,14 +292,25 @@ def render_run_comparison_delta(comparison: Mapping[str, object], *, key: str) -
         st.subheader("What changed between runs")
         st.caption(f"Run A: {runs.get('a', _UNKNOWN)} | Run B: {runs.get('b', _UNKNOWN)}")
         with st.container(horizontal=True, key=f"{key}_metrics"):
-            st.metric("Failures added", str(len(added)), border=True)
-            st.metric("Failures removed", str(len(removed)), border=True)
+            st.metric(
+                "Failures added",
+                str(len(added)),
+                border=True,
+                help="New reproducible failure modes detected in Run B that were absent in Run A.",
+            )
+            st.metric(
+                "Failures removed",
+                str(len(removed)),
+                border=True,
+                help="Prior failure modes that were no longer triggered under Run B.",
+            )
             st.metric(
                 "Target calls in run B",
                 _display(call_totals.get("b")),
                 _signed_delta(call_totals.get("delta"), "vs run A"),
                 delta_color="off",
                 border=True,
+                help="Total driving agent queries evaluated during the test campaign.",
             )
             st.metric(
                 "Coverage AUC in run B",
@@ -307,6 +318,7 @@ def render_run_comparison_delta(comparison: Mapping[str, object], *, key: str) -
                 _signed_delta(trajectory_auc.get("delta"), "vs run A"),
                 delta_color="off",
                 border=True,
+                help="Cumulative scenario exploration efficiency across tested steps.",
             )
         with st.container(horizontal=True, key=f"{key}_coverage"):
             st.badge(
@@ -385,7 +397,7 @@ def _render_mutation_card(
     retained = _meaningful_changes(changes)
     with st.container(border=True, key=key):
         st.badge(
-            "Controlled mutation",
+            "The one changed detail",
             icon=":material/difference:",
             color="orange",
         )

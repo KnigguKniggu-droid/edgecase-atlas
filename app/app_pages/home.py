@@ -125,7 +125,7 @@ if isinstance(stored, DemoArtifacts):
     if certificates:
         certificate = certificates[0]
         st.error(
-            f"Reproducible failure found. The red-signal decision failed the {GATE_TILE} gate.",
+            f"Reproducible failure found. The red-signal decision was wrong in {GATE_SUMMARY}.",
             icon=":material/gpp_bad:",
         )
         # The pair this certificate was actually built from, not the illustrative fixture.
@@ -146,7 +146,7 @@ if isinstance(stored, DemoArtifacts):
         )
         call_ledger = cast(Mapping[str, object], document["call_ledger"])
         second.metric(
-            "Charged target calls",
+            "Times the agent was asked",
             call_ledger["target_calls_total"],
             border=True,
         )
@@ -198,7 +198,7 @@ with st.container(key="atlas_home_proof"):
     # false claim. The last two describe fixed structural facts of the hosted surface.
     facts = (
         (str(len(STARTER_PROPERTY_PACK)), "editable assumptions"),
-        (GATE_TILE, "reproduction gate"),
+        (GATE_TILE, "repeats required to count"),
         ("3", "export formats"),
         ("0", "remote model calls"),
     )

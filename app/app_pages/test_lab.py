@@ -92,7 +92,7 @@ def _render_local_agent_onboarding(*, is_post_run: bool) -> None:
 
 
 render_page_intro(
-    eyebrow="TEST LAB / CONTROLLED MUTATIONS",
+    eyebrow="TEST LAB / ONE CHANGE AT A TIME",
     title="Test one operational assumption at a time.",
     lede=(
         "Choose a synthetic scenario, freeze non-target factors, and let Atlas reproduce and "
@@ -128,6 +128,7 @@ with st.form("atlas_lab_form", border=False):
             value=42,
             step=1,
             key="atlas_lab_seed",
+            help="Starting number that makes simulated randomness exactly repeatable.",
         )
     with controls[1]:
         budget = st.number_input(
@@ -137,6 +138,7 @@ with st.form("atlas_lab_form", border=False):
             value=1,
             step=1,
             key="atlas_lab_budget",
+            help="Maximum number of scenario variations to generate and evaluate.",
         )
     custom_text = st.text_area(
         "Optional synthetic context",
@@ -248,3 +250,4 @@ if isinstance(stored, DemoArtifacts):
 _render_local_agent_onboarding(is_post_run=has_completed_run)
 
 render_privacy_footer(key="atlas_lab_footer")
+

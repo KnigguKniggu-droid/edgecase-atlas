@@ -286,7 +286,7 @@ def test_submit_runs_no_key_demo_and_renders_certificate() -> None:
     metric_labels = {item.label for item in app.metric}
     assert {
         "Reproduction",
-        "Charged target calls",
+        "Times the agent was asked",
         "Estimated cost",
         "Certificate latency",
     }.issubset(metric_labels)
@@ -476,7 +476,7 @@ def test_research_page_renders_evidence_ledger_before_and_after_calibration() ->
         "deliberate starting state" in str(item.value) for item in app.info
     )
     assert any(
-        item.value == "Observed reproduction rate by assumption" for item in app.subheader
+        item.value == "How often each failure repeated" for item in app.subheader
     )
     calibrated_md = [str(item.value) for item in app.markdown]
     assert any(":green-badge[Measured]" in text for text in calibrated_md)

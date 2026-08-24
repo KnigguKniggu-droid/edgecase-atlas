@@ -53,7 +53,7 @@ if st.button(
     icon=":material/biotech:",
     key="atlas_research_run",
 ):
-    with st.status("Running five controlled candidates", expanded=True) as status:
+    with st.status("Testing all five safety rules", expanded=True) as status:
         st.write("Test one scenario for each of the five safety rules, using a fixed seed")
         st.write(f"Apply the {GATE_SUMMARY} repeatability gate")
         st.write("Count the agent calls used, the failures confirmed, and the situations covered")

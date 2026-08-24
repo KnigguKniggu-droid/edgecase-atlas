@@ -44,7 +44,7 @@ render_page_intro(
     eyebrow="COMPARE RUNS / WHAT CHANGED",
     title="See what changed between two compatible test campaigns.",
     lede=(
-        "Compare certificates, charged calls, and observed coverage without sending either "
+        "Compare certificates, agent calls, and observed coverage without sending either "
         "artifact to a remote service."
     ),
     key="atlas_compare_intro",

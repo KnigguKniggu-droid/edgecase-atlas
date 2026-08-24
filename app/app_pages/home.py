@@ -185,6 +185,10 @@ if isinstance(stored, DemoArtifacts):
             ),
             key="atlas_home_downloads",
         )
+        st.caption(
+            "That is one failure, found and reduced to its cause. The Certificates page has a "
+            "worked example for each of the five safety rules."
+        )
     else:
         st.warning(
             "No reproducible failure was found. This is not evidence that the agent is safe.",

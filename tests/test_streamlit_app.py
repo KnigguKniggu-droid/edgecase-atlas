@@ -609,3 +609,29 @@ def test_certificates_page_renders_prominent_replay_command() -> None:
     # Verify replay code block contains the replay CLI command
     code_blocks = [str(item.value) for item in app.code if hasattr(item, "value")]
     assert any("atlas replay certificates/" in block for block in code_blocks)
+
+
+def test_rejected_paste_leaves_no_stale_comparison_on_screen() -> None:
+    """A failure banner must never sit above a result panel from a different pair of runs.
+
+    The delta lives in session state, so an invalid paste used to render the previous
+    comparison directly beneath the error, with no indication which runs the numbers
+    described.
+    """
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = app.switch_page("app_pages/compare_runs.py").run(timeout=30)
+
+    mode = next(item for item in app.segmented_control if item.key == "atlas_compare_mode")
+    mode.set_value("Paste runs")
+    app = app.run(timeout=30)
+
+    for area in app.text_area:
+        if area.key in ("atlas_compare_run_a", "atlas_compare_run_b"):
+            area.set_value("this is not an atlas run document")
+    app = app.run(timeout=30)
+
+    app = next(b for b in app.button if b.key == "atlas_compare_pasted").click().run(timeout=30)
+
+    assert not app.exception
+    assert any("not a pair of valid" in str(item.value) for item in app.error)
+    assert not any(str(item.value) == "What changed between runs" for item in app.subheader)

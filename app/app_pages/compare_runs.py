@@ -137,9 +137,16 @@ elif mode == "Paste runs":
             run_b = _run_document(ingest_run_document(_as_payload(run_b_text)))
             comparison = compare_run_documents(run_a, run_b)
         except (TypeError, ValueError):
+            # Drop the previous result too. Leaving it on screen puts a failure banner directly
+            # above a full delta panel, and nothing tells the reader which runs it came from.
+            st.session_state.pop("atlas_uploaded_comparison", None)
             st.error("The text is not a pair of valid, compatible Atlas runs. Nothing was kept.")
         else:
             st.session_state["atlas_uploaded_comparison"] = comparison
+
+    if not (has_a and has_b):
+        st.session_state.pop("atlas_uploaded_comparison", None)
+
     pasted = st.session_state.get("atlas_uploaded_comparison")
     if isinstance(pasted, Mapping):
         render_run_comparison_delta(pasted, key="atlas_compare_uploaded_result")
@@ -159,9 +166,17 @@ else:
         try:
             parsed_trace = ingest_trace(_as_payload(trace_text))
         except (TypeError, ValueError):
+            # Same reason as above: an invalid paste must not leave the previous trace's
+            # metrics standing underneath the error.
+            st.session_state.pop("atlas_trace_summary", None)
             st.error("The trace is invalid. No content was retained.")
         else:
             st.session_state["atlas_trace_summary"] = parsed_trace
+    else:
+        # Clearing the box returns the panel to its empty state instead of stranding metrics
+        # from a trace that is no longer on screen.
+        st.session_state.pop("atlas_trace_summary", None)
+
     stored_trace = st.session_state.get("atlas_trace_summary")
     if isinstance(stored_trace, TraceSummary):
         first, second, third = st.columns(3)

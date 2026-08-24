@@ -122,23 +122,23 @@ with st.form("atlas_lab_form", border=False):
     controls = st.columns(2)
     with controls[0]:
         seed = st.number_input(
-            "Seed",
+            "Repeat number",
             min_value=0,
             max_value=PUBLIC_SEED_MAX,
             value=42,
             step=1,
             key="atlas_lab_seed",
-            help="Starting number that makes simulated randomness exactly repeatable.",
+            help="Same number, same scenarios. Change it to try a different set.",
         )
     with controls[1]:
         budget = st.number_input(
-            "Test budget",
+            "How many scenarios to try",
             min_value=PUBLIC_BUDGET_MIN,
             max_value=PUBLIC_BUDGET_MAX,
             value=1,
             step=1,
             key="atlas_lab_budget",
-            help="Maximum number of scenario variations to generate and evaluate.",
+            help="How many scenario variations to build and check. No API calls are made.",
         )
     custom_text = st.text_area(
         "Optional synthetic context",

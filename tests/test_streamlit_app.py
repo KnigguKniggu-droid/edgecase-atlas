@@ -317,7 +317,10 @@ def test_test_lab_exposes_bounded_accessible_controls() -> None:
 
     assert not app.exception
     assert app.selectbox[0].label == "Scenario to mutate"
-    assert {item.label for item in app.number_input} == {"Seed", "Test budget"}
+    assert {item.label for item in app.number_input} == {
+        "Repeat number",
+        "How many scenarios to try",
+    }
     assert app.text_area[0].label == "Optional synthetic context"
     assert any(item.label == "Run counterfactual test" for item in app.button)
     widget_keys = [

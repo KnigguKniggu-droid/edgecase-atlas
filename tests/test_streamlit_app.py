@@ -659,3 +659,18 @@ def test_compare_runs_trace_paste_rejection_names_specific_error() -> None:
 
     assert not app.exception
     assert any("Trace is invalid:" in str(item.value) for item in app.error)
+
+
+def test_certificates_page_renders_empty_state_recovery_guidance() -> None:
+    """Unselected failure mode state must render recovery guidance and starter properties."""
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app.session_state["atlas_gallery_property"] = None
+    app = app.switch_page("app_pages/certificates.py").run(timeout=30)
+    assert not app.exception
+
+    assert any(
+        "A failure mode selection is required" in str(item.value)
+        for item in app.info
+    )
+    rendered_md = [str(item.value) for item in app.markdown]
+    assert any("Red signal requires a non-proceed action" in text for text in rendered_md)

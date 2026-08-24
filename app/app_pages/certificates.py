@@ -122,12 +122,19 @@ if property_id:
             icon=":material/info:",
         )
 else:
-    st.info(
-        "A failure mode selection is required to inspect curated forensic artifacts. "
-        "Select one of the available failure modes above:",
-        icon=":material/touch_app:",
-    )
-    for item in STARTER_PROPERTY_PACK:
-        st.markdown(f"- **{item.title}**: {item.description}")
+    with st.container(border=True, key="atlas_gallery_empty"):
+        st.info(
+            "A failure mode selection is required to inspect curated forensic artifacts. "
+            "Select one of the available failure modes above, or test custom assumptions in the "
+            "Test Lab:",
+            icon=":material/touch_app:",
+        )
+        for item in STARTER_PROPERTY_PACK:
+            st.markdown(f"- **{item.title}**: {item.description}")
+        st.page_link(
+            "app_pages/test_lab.py",
+            label="Open the Test Lab to run a custom test",
+            icon=":material/radar:",
+        )
 
 render_privacy_footer(key="atlas_gallery_footer")

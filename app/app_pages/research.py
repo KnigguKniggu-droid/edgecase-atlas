@@ -167,9 +167,11 @@ with st.container(key="atlas_research_ledger"):
 with st.container(key="atlas_research_next"):
     st.subheader("The defensible research step")
     st.markdown(
-        "The planned study compares constraint-guided counterfactual search with random, fixed "
-        "template, unguided language-model, and diversity-guided baselines under matched call "
-        "budgets. No superiority claim appears here because those campaigns have not been run."
+        "The next step is a fair head-to-head test: give this method and four simpler ones the "
+        "same number of tries each, and see which finds more real failures. The four are "
+        "random guessing, a fixed template, an AI left to explore on its own, and a search "
+        "that just chases variety. That test has not been run, so nothing here claims this "
+        "method wins."
     )
     st.caption(
         "All scenarios shown in this public application are simulated and synthetic. "

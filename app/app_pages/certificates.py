@@ -57,14 +57,30 @@ if property_id:
         metrics = artifact["metrics"]
         st.warning(artifact["disclaimer"], icon=":material/science:")
         first, second, third, fourth = st.columns(4)
-        first.metric("Certificates", metrics["certificate_count"], border=True)
-        second.metric("Target calls", metrics["target_calls"], border=True)
-        third.metric("Coverage cells", metrics["coverage_cells"], border=True)
+        first.metric(
+            "Certificates",
+            metrics["certificate_count"],
+            border=True,
+            help="Verified, self-contained failure reproduction records.",
+        )
+        second.metric(
+            "Target calls",
+            metrics["target_calls"],
+            border=True,
+            help="Total times the simulated driving agent was asked to decide.",
+        )
+        third.metric(
+            "Coverage cells",
+            metrics["coverage_cells"],
+            border=True,
+            help="Distinct driving scenario conditions explored during evaluation.",
+        )
         rate = metrics["per_property_reproduction_rates"][str(property_id)]
         fourth.metric(
-            "Reproduction",
+            "Reruns that failed",
             f"{rate['reproductions']}/{rate['trials']}",
             border=True,
+            help="Number of repeated trials where the agent made the same unsafe decision.",
         )
 
         with st.container(border=True, key="atlas_gallery_replay"):
@@ -138,3 +154,4 @@ else:
         )
 
 render_privacy_footer(key="atlas_gallery_footer")
+

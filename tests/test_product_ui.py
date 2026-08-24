@@ -137,7 +137,7 @@ def test_representative_product_helpers_render_with_apptest(tmp_path: Path) -> N
 
     assert not app.exception
     assert app.title[0].value == "Test one controlled change"
-    assert {metric.label for metric in app.metric} == {"Ego speed", "Speed limit", "Actors"}
+    assert {metric.label for metric in app.metric} == {"Test car speed", "Speed limit", "Actors"}
     rendered = " ".join(
         str(getattr(item, "value", ""))
         for element_type in ("caption", "markdown", "subheader")

@@ -91,7 +91,7 @@ def render_scenario_card(
                 color="gray",
             )
         with st.container(horizontal=True, key=f"{key}_metrics"):
-            st.metric("Ego speed", _with_unit(scenario.get("speed_mph"), "mph"), border=True)
+            st.metric("Test car speed", _with_unit(scenario.get("speed_mph"), "mph"), border=True)
             st.metric(
                 "Speed limit",
                 _with_unit(scenario.get("speed_limit_mph"), "mph"),
@@ -230,7 +230,7 @@ def render_failure_certificate(
                 border=True,
             )
             st.metric(
-                "Certificate latency",
+                "Time the agent took",
                 _with_unit(certificate.get("latency_ms"), "ms"),
                 border=True,
             )
@@ -241,7 +241,7 @@ def render_failure_certificate(
             )
             st.metric(
                 "Estimated cost",
-                _format_cost(estimated_cost) if cost_available else "Unknown",
+                _format_cost(estimated_cost) if cost_available else "None, no paid model",
                 border=True,
             )
         replay_command = certificate.get("replay_command")

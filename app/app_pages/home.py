@@ -150,7 +150,7 @@ if isinstance(stored, DemoArtifacts):
             call_ledger["target_calls_total"],
             border=True,
         )
-        third.metric("Certificate latency", f"{certificate['latency_ms']} ms", border=True)
+        third.metric("Time the agent took", f"{certificate['latency_ms']} ms", border=True)
 
         render_evidence_pipeline(certificate, key="atlas_home_pipeline")
         render_failure_certificate(

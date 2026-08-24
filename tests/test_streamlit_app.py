@@ -285,10 +285,10 @@ def test_submit_runs_no_key_demo_and_renders_certificate() -> None:
     assert any("Reproducible failure found" in item.value for item in app.error)
     metric_labels = {item.label for item in app.metric}
     assert {
-        "Reproduction",
+        "Reruns that failed",
         "Times the agent was asked",
         "Estimated cost",
-        "Certificate latency",
+        "Time the agent took",
     }.issubset(metric_labels)
     assert any("atlas replay certificates/" in item.value for item in app.code)
     assert len(app.get("download_button")) == 3

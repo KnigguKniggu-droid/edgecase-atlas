@@ -1,6 +1,8 @@
 # EdgeCase Atlas
 
-EdgeCase Atlas is an open-source developer tool for property-based red-team testing of AI driving-decision agents. It generates constraint-preserving counterfactuals, repeats stochastic failures, and reduces each accepted violation to a 1-minimal reproducing contrast under the declared reducer set.
+EdgeCase Atlas is an open-source tool for testing AI driving-decision agents. It builds two road scenarios that are identical except for one detail, asks the agent what to do in each, and compares the answers against a safety rule. When the agent contradicts one, Atlas reruns the case to check the failure is real rather than a fluke, then strips the scenario down until only the difference responsible for it remains.
+
+In the project's own terms: it performs property-based red-team testing, generating constraint-preserving counterfactuals, repeating stochastic failures, and reducing each accepted violation to a 1-minimal reproducing contrast under the declared reducer set.
 
 The 0.1 alpha targets structured-text scenarios and simulated decision agents. It is not a vehicle controller, certification system, legal-compliance tool, or statement of real-world safety. Every property is an editable operational assumption.
 
@@ -10,7 +12,7 @@ The 0.1 alpha targets structured-text scenarios and simulated decision agents. I
 2. Select any of the five starter safety properties.
 3. Generate valid source and single-factor follow-up scenarios under a fixed seed and budget.
 4. Require at least four reproductions across five confirmation trials.
-5. Reduce actors, metadata, attributes, numeric deltas, and descriptions while preserving typed constraints and reproduction.
+5. Strip away everything the failure does not need, one element at a time, keeping only changes that leave the scenario valid and still failing.
 6. Export canonical JSON, append-only JSONL, and standalone HTML evidence with replay commands.
 
 The included no-key Streamlit application runs only curated synthetic examples and the faulty fixture. It does not expose subprocesses, arbitrary HTTP endpoints, user code execution, or file uploads. To compare your own runs there, paste the text of an Atlas JSON run document or JSONL trace, bounded at 2,000,000 bytes and strictly validated. Pasted content is parsed as inert data and is never imported, executed, forwarded, or retained.

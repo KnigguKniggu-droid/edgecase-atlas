@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 
 from edgecase_atlas import __version__
+from edgecase_atlas.adapters import AdapterError
 from edgecase_atlas.coverage import CoveragePoint, CoverageTracker
 from edgecase_atlas.evaluation import (
     AgentAdapter,
@@ -81,65 +82,73 @@ class AtlasEngine:
         if corpus:
             executed_streams.append("search")
         for generated, search_seed in zip(corpus, streams.search_seeds(len(corpus)), strict=True):
-            search_trial = await evaluate_pair(
-                adapter,
-                generated.property,
-                generated.counterfactual,
-                search_seed,
-                ledger,
-                phase="search",
-            )
-            tracker.observe(
-                generated.property,
-                generated.counterfactual,
-                search_trial.source_decision,
-                search_trial.follow_up_decision,
-                charged_target_calls=ledger.target_calls_total,
-            )
-            if not (
-                search_trial.property_result.applicable and search_trial.property_result.violated
-            ):
-                continue
-            if "engineering-gate" not in executed_streams:
-                executed_streams.append("engineering-gate")
-            confirmation = await evaluate_suspected_violation(
-                adapter,
-                generated.property,
-                generated.counterfactual,
-                streams.engineering_gate_seeds(CONFIRMATION_TRIALS),
-                ledger,
-                phase="confirmation",
-                required_reproductions=REQUIRED_REPRODUCTIONS,
-            )
-            start = ledger.target_calls_total - 2 * len(confirmation.trials)
-            for index, trial in enumerate(confirmation.trials, start=1):
+            try:
+                search_trial = await evaluate_pair(
+                    adapter,
+                    generated.property,
+                    generated.counterfactual,
+                    search_seed,
+                    ledger,
+                    phase="search",
+                )
                 tracker.observe(
                     generated.property,
                     generated.counterfactual,
-                    trial.source_decision,
-                    trial.follow_up_decision,
-                    charged_target_calls=start + 2 * index,
+                    search_trial.source_decision,
+                    search_trial.follow_up_decision,
+                    charged_target_calls=ledger.target_calls_total,
                 )
-            if not confirmation.accepted:
-                continue
-            if "shrink" not in executed_streams:
-                executed_streams.append("shrink")
-            minimization = await HierarchicalMinimizer().minimize(
-                adapter, generated.property, generated.counterfactual, streams, ledger
-            )
-            tracker.extend_constant_to(ledger.target_calls_total)
-            if minimization.accepted:
-                certificate = _certificate(
+                outcome = search_trial.property_result
+                if not (outcome.applicable and outcome.violated):
+                    continue
+                if "engineering-gate" not in executed_streams:
+                    executed_streams.append("engineering-gate")
+                confirmation = await evaluate_suspected_violation(
                     adapter,
                     generated.property,
-                    minimization,
-                    seed,
-                    _property_digest(generated.property),
-                    engine_config_hash,
+                    generated.counterfactual,
+                    streams.engineering_gate_seeds(CONFIRMATION_TRIALS),
+                    ledger,
+                    phase="confirmation",
+                    required_reproductions=REQUIRED_REPRODUCTIONS,
                 )
-                certificates.append(
-                    MinimalReproducingCertificate(certificate, minimization.label, minimization)
+                start = ledger.target_calls_total - 2 * len(confirmation.trials)
+                for index, trial in enumerate(confirmation.trials, start=1):
+                    tracker.observe(
+                        generated.property,
+                        generated.counterfactual,
+                        trial.source_decision,
+                        trial.follow_up_decision,
+                        charged_target_calls=start + 2 * index,
+                    )
+                if not confirmation.accepted:
+                    continue
+                if "shrink" not in executed_streams:
+                    executed_streams.append("shrink")
+                minimization = await HierarchicalMinimizer().minimize(
+                    adapter, generated.property, generated.counterfactual, streams, ledger
                 )
+                tracker.extend_constant_to(ledger.target_calls_total)
+                if minimization.accepted:
+                    certificate = _certificate(
+                        adapter,
+                        generated.property,
+                        minimization,
+                        seed,
+                        _property_digest(generated.property),
+                        engine_config_hash,
+                    )
+                    certificates.append(
+                        MinimalReproducingCertificate(certificate, minimization.label, minimization)
+                    )
+            except AdapterError:
+                # A target that fails on one candidate must not discard the certificates
+                # already found. But a target that has produced nothing is simply broken,
+                # and hiding that would let a misconfigured agent look like a clean run,
+                # so the error still propagates until there is evidence worth keeping.
+                if not certificates:
+                    raise
+                continue
         return RunResult(
             RunMetadata(
                 _run_id(seed, budget, adapter, property_pack_digest, engine_config_hash),

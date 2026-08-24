@@ -197,8 +197,15 @@ else:
         third.metric("Event types", len(stored_trace.event_counts), border=True)
         st.subheader("Event distribution")
         st.caption("Event types observed across the trace sequence.")
+        readable = {
+            "run_started": "Run started",
+            "target_call": "Agent was asked a question",
+            "certificate": "Failure certificate produced",
+            "run_completed": "Run finished",
+            "confirmed": "Failure confirmed by repeat",
+        }
         for event_name, count in sorted(stored_trace.event_counts.items()):
-            st.write(f"- `{event_name}`: {count}")
+            st.write(f"- {readable.get(event_name, event_name)}: {count}")
     else:
         st.caption("No trace loaded yet. Paste an Atlas .jsonl trace to inspect event metrics.")
 

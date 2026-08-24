@@ -313,7 +313,7 @@ def render_run_comparison_delta(comparison: Mapping[str, object], *, key: str) -
                 help="Total driving agent queries evaluated during the test campaign.",
             )
             st.metric(
-                "Coverage AUC in run B",
+                "Situations explored in run B",
                 _format_number(trajectory_auc.get("b")),
                 _signed_delta(trajectory_auc.get("delta"), "vs run A"),
                 delta_color="off",

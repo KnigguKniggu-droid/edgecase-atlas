@@ -136,10 +136,10 @@ with st.container(key="atlas_research_ledger"):
         ev_4 = unrun_note
 
     rows = [
-        ("Synthetic failure trigger", status_1, ev_1),
-        ("Target invocation efficiency", status_2, ev_2),
-        ("Discrete behavioral coverage", status_3, ev_3),
-        ("Deterministic artifact identity", status_4, ev_4),
+        ("Found a failure in the test agent", status_1, ev_1),
+        ("Used few agent calls to find it", status_2, ev_2),
+        ("Range of different situations tested", status_3, ev_3),
+        ("Same run produces the same evidence", status_4, ev_4),
         (
             "Comparative baseline superiority",
             ("Planned", "blue"),

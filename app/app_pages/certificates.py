@@ -68,7 +68,10 @@ if property_id:
         )
 
         with st.container(border=True, key="atlas_gallery_replay"):
-            st.caption("Replay and verify this exact failure locally with the Atlas CLI:")
+            st.caption(
+                "Replay and verify this exact failure locally. Download the certificate below, "
+                "put it in a `certificates/` folder beside your `atlas.yaml`, then run:"
+            )
             st.code(str(certificate["replay_command"]), language="shell", wrap_lines=True)
 
         # Index directly. A silent empty fallback here would render a blank fault line if the
@@ -96,7 +99,7 @@ if property_id:
                 DownloadArtifact(
                     "Certificate JSON",
                     certificate_bytes,
-                    f"{property_id}-certificate.json",
+                    f"{certificate['certificate_id']}.json",
                     "application/json",
                     ":material/verified:",
                 ),

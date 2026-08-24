@@ -205,3 +205,15 @@ def test_fault_line_text_wraps_on_the_narrowest_supported_screens() -> None:
     assert "_faultline" in block
     assert "flex-wrap: wrap" in block
     assert "overflow-wrap: anywhere" in block or "word-break: break-word" in block
+
+
+def test_mutation_card_renders_scenario_id_explanation_caption() -> None:
+    """Mutation card must explain why scenario_id is not counted as a tested factor."""
+    app = AppTest.from_file(str(ENTRYPOINT), default_timeout=30).run()
+    assert not app.exception
+
+    captions = [str(item.value) for item in app.caption]
+    assert any(
+        "scenario identifier changes with every follow-up scenario" in text
+        for text in captions
+    )

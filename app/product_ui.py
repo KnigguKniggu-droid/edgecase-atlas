@@ -399,6 +399,10 @@ def _render_mutation_card(
                 delta_color="off",
                 border=True,
             )
+        st.caption(
+            "The scenario identifier changes with every follow-up scenario and is not "
+            "counted as a tested factor."
+        )
 
 
 def _render_pipeline_stage(

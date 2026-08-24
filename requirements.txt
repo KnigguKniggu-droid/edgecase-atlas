@@ -4,6 +4,10 @@
 # The trailing '.' installs this project from the repository on every deploy. Without it the
 # hosted environment keeps an older build of edgecase_atlas while app/ files deploy live, so
 # any app module importing a newly added package symbol raises ImportError in production.
+#
+# Touched 2026-08-24 to force a hosted rebuild. The deployment had stopped picking up new
+# commits and was serving app files from several commits back, so labels already corrected
+# in the repository were still showing their old wording on the public site.
 httpx>=0.28,<1
 hypothesis>=6.156,<7
 jinja2>=3.1,<4

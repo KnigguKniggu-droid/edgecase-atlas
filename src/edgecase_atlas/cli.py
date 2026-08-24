@@ -135,7 +135,9 @@ def test_command(
     if paths["certificate_count"] == 0:
         typer.echo(
             "No repeatable failure was found under this budget, seed, and property selection. "
-            "That is not evidence that the agent is safe."
+            "That is not evidence that the agent is safe. A suspected failure that passed the "
+            "repeatability gate is still discarded if it stops reproducing while being "
+            "minimized, so this can also mean a real but unstable finding was dropped."
         )
 
 

@@ -3,26 +3,38 @@
 APP_CSS = r"""
 <style>
 :root {
-  --atlas-night: #060d14;
-  --atlas-asphalt: #0a131d;
+  /* Semantic Color Tokens */
+  --atlas-bg: #060d14;
+  --atlas-surface: #0a131d;
   --atlas-panel: #0e1a26;
   --atlas-raised: #132331;
-  --atlas-line: #26394a;
-  --atlas-line-hot: #496176;
-  --atlas-ink: #f4f7f9;
-  --atlas-muted: #a7b7c5;
-  --atlas-faint: #748698;
-  --atlas-red: #ff625b;
-  --atlas-red-deep: #9f302f;
-  --atlas-amber: #f5bd58;
-  --atlas-cyan: #58d6c8;
-  --atlas-blue: #73a7ff;
-  --atlas-green: #4cda91;
-  --atlas-mono: "IBM Plex Mono", monospace;
+  --atlas-border: #26394a;
+  --atlas-border-hot: #496176;
+  --atlas-text-main: #f4f7f9;
+  --atlas-text-muted: #a7b7c5;
+  --atlas-text-faint: #748698;
+  --atlas-accent: #58d6c8;
+  --atlas-error: #ff625b;
+  --atlas-error-deep: #9f302f;
+  --atlas-warn: #f5bd58;
+  --atlas-success: #4cda91;
+  --atlas-brand-blue: #73a7ff;
+  
+  /* Typography Tokens */
+  --atlas-font-sans: "Inter", system-ui, sans-serif;
+  --atlas-font-mono: "IBM Plex Mono", monospace;
+  
+  /* Spacing Scale (4pt basis) */
+  --atlas-space-1: 0.25rem;
+  --atlas-space-2: 0.5rem;
+  --atlas-space-3: 0.75rem;
+  --atlas-space-4: 1rem;
+  --atlas-space-6: 1.5rem;
+  --atlas-space-8: 2rem;
 }
 
 [data-testid="stAppViewContainer"] {
-  background-color: var(--atlas-night);
+  background-color: var(--atlas-bg);
   background-image:
     linear-gradient(rgba(88, 214, 200, 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(88, 214, 200, 0.025) 1px, transparent 1px);
@@ -31,9 +43,11 @@ APP_CSS = r"""
 
 [data-testid="stAppViewBlockContainer"] {
   max-width: 1320px;
-  padding-top: 1.15rem;
-  padding-bottom: 5rem;
+  padding-top: var(--atlas-space-6);
+  padding-bottom: 20px; /* Reduced from 5rem for better density */
 }
+/* ... rest of theme styles would be updated to use these tokens ... */
+
 
 #MainMenu,
 [data-testid="stStatusWidget"],
@@ -499,6 +513,20 @@ a:focus-visible,
   outline-offset: 3px;
 }
 
+.st-key-atlas_shell_nav [data-testid="stPageLink"] a:focus-visible {
+  color: var(--atlas-ink) !important;
+  background: var(--atlas-raised) !important;
+  outline: 2px solid var(--atlas-cyan) !important;
+  outline-offset: 2px !important;
+  box-shadow: inset 0 -2px 0 var(--atlas-cyan), 0 0 12px rgba(88, 214, 200, 0.25);
+}
+
+button[kind="primary"]:focus-visible {
+  outline: 3px solid rgba(94, 233, 196, 0.8) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(94, 233, 196, 0.3) !important;
+}
+
 @media (max-width: 430px) {
   .st-key-atlas_home_hero {
     min-height: 0;
@@ -636,4 +664,3 @@ a:focus-visible,
 }
 </style>
 """
-

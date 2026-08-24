@@ -82,7 +82,7 @@ def render_scenario_card(
             )
             st.badge(
                 f"Surface: {_display(scenario.get('surface'))}",
-                icon=":material/texture:",
+                icon=_surface_icon(scenario.get("surface")),
                 color="gray",
             )
             st.badge(
@@ -106,7 +106,7 @@ def render_scenario_card(
                 for actor_type, count in sorted(actor_counts.items()):
                     st.badge(
                         f"{count} {actor_type}",
-                        icon=":material/directions_walk:",
+                        icon=_actor_icon(actor_type),
                         color="gray",
                     )
         else:
@@ -224,7 +224,7 @@ def render_failure_certificate(
             )
         with st.container(horizontal=True, key=f"{key}_metrics"):
             st.metric(
-                "Reproduction",
+                "Reruns that failed",
                 f"{_integer(certificate.get('reproduction_count'))}/"
                 f"{_integer(certificate.get('reproduction_trials'))}",
                 border=True,
@@ -466,6 +466,41 @@ def _display(value: object) -> str:
 def _with_unit(value: object, unit: str) -> str:
     displayed = _display(value)
     return displayed if displayed == _UNKNOWN else f"{displayed} {unit}"
+
+
+def _surface_icon(value: object) -> str:
+    surface = str(value or "").casefold()
+    if any(term in surface for term in ("wet", "rain", "puddle", "flood")):
+        return ":material/water_drop:"
+    if any(term in surface for term in ("snow", "ice", "icy", "frost", "slush")):
+        return ":material/ac_unit:"
+    if "dry" in surface:
+        return ":material/wb_sunny:"
+    return ":material/texture:"
+
+
+def _visibility_icon(value: object) -> str:
+    visibility = str(value or "").casefold()
+    if any(term in visibility for term in ("fog", "mist", "smoke", "haze", "reduced")):
+        return ":material/foggy:"
+    if any(term in visibility for term in ("occluded", "blocked", "blind")):
+        return ":material/visibility_off:"
+    if any(term in visibility for term in ("night", "dark", "dusk", "dawn")):
+        return ":material/dark_mode:"
+    return ":material/visibility:"
+
+
+def _actor_icon(value: object) -> str:
+    actor = str(value or "").casefold()
+    if any(term in actor for term in ("vehicle", "car", "truck", "bus", "auto", "van")):
+        return ":material/directions_car:"
+    if any(term in actor for term in ("bike", "bicycle", "cyclist", "motorcycle", "scooter")):
+        return ":material/two_wheeler:"
+    if any(term in actor for term in ("pedestrian", "walker", "person", "child")):
+        return ":material/directions_walk:"
+    if any(term in actor for term in ("hazard", "obstacle", "debris", "cone", "barrier")):
+        return ":material/warning:"
+    return ":material/directions_walk:"
 
 
 def _signal_color(value: object) -> BadgeColor:

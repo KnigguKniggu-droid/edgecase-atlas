@@ -460,13 +460,16 @@ textarea {
   border-radius: 11px;
 }
 
-.st-key-atlas_research_ledger [data-testid="stHorizontalBlock"] {
-  padding: 0.65rem 0.8rem;
+[class*="st-key-atlas_ledger_row_"] {
   border-bottom: 1px solid var(--atlas-line);
 }
 
-.st-key-atlas_research_ledger [data-testid="stHorizontalBlock"]:last-child {
+[class*="st-key-atlas_ledger_row_"]:last-child {
   border-bottom: none;
+}
+
+.st-key-atlas_research_ledger [data-testid="stHorizontalBlock"] {
+  padding: 0.65rem 0.8rem;
 }
 
 .st-key-atlas_lab_onboarding_section,

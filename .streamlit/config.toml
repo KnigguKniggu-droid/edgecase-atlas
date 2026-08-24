@@ -1,11 +1,11 @@
 [theme]
 base = "dark"
-primaryColor = "#B83A32"
+primaryColor = "#0F766E"
 backgroundColor = "#060D14"
 secondaryBackgroundColor = "#0E1A26"
 textColor = "#EEF3F8"
-linkColor = "#66D9D0"
-codeTextColor = "#D9F5F2"
+linkColor = "#5EE9C4"
+codeTextColor = "#D6F7EC"
 codeBackgroundColor = "#0C1118"
 borderColor = "#26394A"
 redColor = "#FF625B"
@@ -66,7 +66,7 @@ backgroundColor = "#0C1118"
 secondaryBackgroundColor = "#151C26"
 textColor = "#EEF3F8"
 borderColor = "#26394A"
-primaryColor = "#B83A32"
+primaryColor = "#0F766E"
 
 [server]
 headless = true
